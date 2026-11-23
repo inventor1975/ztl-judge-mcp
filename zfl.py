@@ -1,0 +1,2798 @@
+# -*- coding: utf-8 -*-
+"""
+ZFL v2 — one language for the whole instrument, and its surface is a TABLE.
+
+v1 had three input languages and made you declare which one you were in:
+`statement` (atoms with statuses and an `assert`), `system` (sentences
+defined through each other with `Tr`), and — never exposed in the studio at
+all — the sheet language of the numeric floor (`x=1500 earned:inv-17 RUB`).
+Two of the three were JSON, all three were hand-written, and the curator's
+verdict on them was the only one that mattered: "even I do not understand
+how it works."
+
+THE RESHAPE, settled in words before a line was written:
+
+  * the three were never three languages. They are three ROLES of one
+    document. `status: "Z"` and `credit` are the same field — the name has
+    no witness. `status: "T"` and `earned:inv-17` are the same field, the
+    second merely naming the witness. `Tr(x)` is not a genre, it is what a
+    name looks like when its ground is a formula over names;
+
+  * so there is ONE document: a list of names, each carrying a ground, plus
+    what you claim about them. The GENRE IS COMPUTED, never declared. Which
+    instruments run — the passport office, the numeric floor, the ledger,
+    the judge — follows from which cells are filled, exactly as this corpus
+    computes E, computes the passport, computes the docket's genre. The
+    input was the last place still demanding to be told;
+
+  * and the surface is not text. It is a TABLE, the curator's correction to
+    a line-based sketch that was still a syntax to learn. A form's columns
+    say what goes in them and whether they are required; a grammar does not.
+    Formulas survive in exactly two cells, `ground` when a name is defined
+    and `claim`, and nowhere else.
+
+THE SPEC BELOW IS THE SINGLE SOURCE. The form's widgets, the validator's
+rules, and the reference page are all generated from `COLUMNS` and
+`DOC_FIELDS`. A column added here appears in all three or in none — which
+is the same anti-drift discipline the rest of this corpus runs on, applied
+to the one place a user actually touches.
+
+Localisation is hand-written, EN and RU, and deliberately not machine
+translated: this vocabulary IS the content, and an auto-translator turns
+"on credit" into "on loan" — precisely the word that carries the meaning.
+
+Run:  python3 tool/test_zfl.py
+"""
+
+# --------------------------------------------------------------- the spec
+#
+# `type` drives the widget, so the form needs no separate description:
+#   choice -> a dropdown        bool   -> a yes/no toggle
+#   number -> a stepper         text   -> a field
+# `required_when` is a rule the validator reads and the form renders as a
+# field that lights up only when it is actually needed.
+
+# THE LANGUAGES, in one place, each written in its own. Adding one is DATA:
+# every lookup falls back to English for a string not there yet, so a
+# half-translated language works instead of breaking. That fallback is the
+# design — it lets a language ship the day somebody needs it rather than the
+# day it is finished.
+#
+# The hand-written rule stands and is why this list is short: this vocabulary
+# IS the content, and an automatic translation turns "on credit" into "on
+# loan" — precisely the word that carries the meaning.
+# (code, what the language calls itself, what to CALL IT TO A MODEL). The
+# third field exists because the AI is part of the interface: a studio in
+# Hebrew whose assistant answers in English is not localised, it is
+# half-localised, and the half that talks is the one people notice.
+LANGS = [
+    ("en", "English", "English"), ("ru", "Русский", "Russian"),
+    ("uk", "Українська", "Ukrainian"), ("he", "עברית", "Hebrew"),
+    ("de", "Deutsch", "German"), ("fr", "Français", "French"),
+    ("es", "Español", "Spanish"),
+]
+RTL = {"he"}
+
+
+COLUMNS = [
+    {
+        "key": "name", "type": "text", "required": True, "advanced": False,
+        "en": ("name", "what we call it; formulas use this"),
+        "ru": ("имя", "как называем; им же пользуемся в формулах"),
+        "de": ("Name", "wie wir es nennen; damit rechnen auch die Formeln"),
+        "fr": ("nom", "comme nous l'appelons ; les formules s'en servent"),
+        "es": ("nombre", "cómo lo llamamos; las fórmulas lo usan"),
+        "uk": ("ім'я", "як називаємо; ним же користуємось у формулах"),
+        "he": ("שם", "איך קוראים לו; באותו שם משתמשים בנוסחאות"),
+        "eg": ["line", "budget", "L"],
+    },
+    {
+        "key": "means", "type": "text", "required": False, "advanced": False,
+        "en": ("means", "what it MEANS for this to be true"),
+        "ru": ("значит", "что означает истинность этого имени"),
+        "de": ("bedeutet", "was es HEISST, dass dies wahr ist"),
+        "fr": ("signifie", "ce que cela VEUT DIRE que ce soit vrai"),
+        "es": ("significa", "qué SIGNIFICA que esto sea verdadero"),
+        "uk": ("означає", "що означає істинність цього імені"),
+        "he": ("פירושו", "מה זה אומר שהשם הזה אמיתי"),
+        "eg": ["the invoice line", "this sentence is false"],
+        # not decoration: the gloss is the polarity auditor. `fresh` already
+        # means "not revoked", so "not fresh" asserts a positive fact —
+        # names lie, glosses do not.
+    },
+    {
+        "key": "status", "type": "choice", "required": True, "advanced": False,
+        "options": ["verified", "refuted", "unverified", "defined"],
+        # A WIDGET THAT LIED. With no default the cell held "" while the
+        # browser, having no matching option, displayed the first one —
+        # "verified". So a fresh row SHOWED verified and STORED nothing, and
+        # the reader was answering for a status they had never chosen. Found
+        # 2026-08-15 by reading the live page rather than the source.
+        #
+        # The default is the doctrine's own: unverified. Zero trust means a
+        # name arrives unearned, the judge already reads an unlisted atom as
+        # Z, and a studio whose default was `verified` would be granting
+        # truth on credit in its very first row.
+        "default": "unverified",
+        "en": ("status", "where it stands with us"),
+        "ru": ("статус", "откуда оно у нас"),
+        "de": ("Status", "woher wir es haben"),
+        "fr": ("statut", "d'où cela nous vient"),
+        "es": ("estado", "de dónde nos viene"),
+        "uk": ("статус", "звідки воно в нас"),
+        "he": ("מעמד", "מאיפה זה הגיע אלינו"),
+        "labels": {
+            "en": {"verified": "verified", "refuted": "refuted",
+                   "unverified": "not verified", "defined": "defined"},
+            "ru": {"verified": "проверено", "refuted": "опровергнуто",
+                   "unverified": "не проверено", "defined": "определено"},
+            "de": {"verified": "geprüft", "refuted": "widerlegt", "unverified": "ungeprüft", "defined": "definiert"},
+            "fr": {"verified": "vérifié", "refuted": "réfuté", "unverified": "non vérifié", "defined": "défini"},
+            "es": {"verified": "verificado", "refuted": "refutado", "unverified": "sin verificar", "defined": "definido"},
+            "uk": {"verified": "перевірено", "refuted": "спростовано", "unverified": "не перевірено", "defined": "визначено"},
+            "he": {"verified": "מאומת", "refuted": "הופרך", "unverified": "לא אומת", "defined": "מוגדר"},
+        },
+    },
+    {
+        # ONE CELL, TWO KINDS OF CONTENT, and the curator was right that this
+        # is a trap: `inv-17` is an opaque name the machine never looks
+        # inside, `~Tr(L)` is a formula it reads and evaluates. The status
+        # decides which — which is coherent, and is exactly the sort of rule
+        # a person should not have to hold in their head. So the cell says
+        # per row what it wants, and the form asks again whenever the status
+        # changes. They are mutually exclusive by construction — a name is
+        # witnessed or defined, never both — so two columns would leave one
+        # of them always empty; the fix is a cell that announces its mode,
+        # not a wider table.
+        "key": "ground", "type": "text", "advanced": False,
+        "required_when": {"status": ["verified", "refuted", "defined"]},
+        "en": ("ground", "what backs it, or the formula defining it"),
+        "ru": ("основание", "чем подтверждено или как определено"),
+        "de": ("Grundlage", "was es belegt, oder die definierende Formel"),
+        "fr": ("fondement", "ce qui l'atteste, ou la formule qui le définit"),
+        "es": ("fundamento", "qué lo respalda, o la fórmula que lo define"),
+        "uk": ("підстава", "чим підтверджено або як визначено"),
+        "he": ("אסמכתא", "מה מאשש אותו, או הנוסחה שמגדירה אותו"),
+        "eg": ["inv-17", "~Tr(L)"],
+        # THE FIELD OFFERS NAMES INSTEAD OF DEMANDING THEM. Reported live by
+        # the curator: a free-text ground made people think the CONTENT
+        # mattered. It does not — the machine never looks inside an opaque
+        # ground, so the only decision carrying meaning is whether two rows
+        # name the SAME ground or different ones. A dropdown of ready-made
+        # names leaves exactly that decision and removes the rest, and the
+        # commonest refusal in the studio (E_NOGROUND on a row someone
+        # marked verified) stops being reachable at all.
+        #
+        # What is STORED is `ground-1`; what is SHOWN is "Ground 1" or
+        # "Основание 1". Two reasons, both load-bearing: the whole cascade
+        # rests on ground identity, so switching the interface language must
+        # not silently rename anything, and a displayed name with a space in
+        # it would be cut in half by E_GROUND_SPACES.
+        #
+        # `defined` is deliberately absent from `when_status`: there the cell
+        # holds a formula the machine reads, not a name it only compares.
+        "suggest": {
+            "when_status": ["verified", "refuted"],
+            "prefix": "ground-",
+            "label": {"en": "Ground %d", "ru": "Основание %d"},
+            # free text stays reachable, and it is not a courtesy: `inv-17`
+            # is the only thing tying a row to a real piece of paper, and a
+            # ledger of Ground 1..10 would have thrown that away.
+            "own": {"en": "a name of my own…", "ru": "своё имя…"},
+        },
+        "help_when": {
+            "verified": {
+                "en": ("the name of the document or act that verified it — "
+                       "just a name; the machine never looks inside",
+                       "inv-17"),
+                "ru": ("имя документа или акта, который это подтвердил — "
+                       "просто имя; машина внутрь не смотрит", "inv-17")},
+            "refuted": {
+                "en": ("the name of what refuted it", "inv-17"),
+                "ru": ("имя того, что это опровергло", "inv-17")},
+            "defined": {
+                "en": ("A FORMULA over other names — this one IS read: "
+                       "~Tr(L) says the row is false exactly when L is true",
+                       "~Tr(L)"),
+                "ru": ("ФОРМУЛА через другие имена — вот её машина читает: "
+                       "~Tr(L) значит, что строка ложна ровно когда L "
+                       "истинно", "~Tr(L)")},
+            "unverified": {
+                "en": ("nothing needed — an unverified name has no ground",
+                       ""),
+                "ru": ("ничего не нужно — у непроверенного имени основания "
+                       "нет", "")},
+        },
+    },
+    {
+        # WHICH DEPENDENCY THIS IS, which is not the same question as
+        # `ground_kind` and must not be folded into it. `ground_kind` says how
+        # a ground can be LOST — a document is withdrawn, a certificate
+        # expires, an act cannot be taken back. This says what the ground DOES
+        # — supports a claim, or permits it. An order and an invoice are both
+        # documents and are not interchangeable.
+        #
+        # Measured, not supposed: db/probe_classes ran a collective at full
+        # genuine redundancy in every dimension and losing one agent cost
+        # 0.0000 while losing the authority root cost 1.0000. Redundancy in
+        # one dimension does not substitute for redundancy in another.
+        #
+        # ADVANCED and defaulted to evidence, so the table a person fills to
+        # count sweets is exactly the table they filled yesterday.
+        "key": "dimension", "type": "choice", "required": False,
+        "advanced": True, "default": "evidence",
+        "options": ["evidence", "authority"],
+        "en": ("dimension", "does this SUPPORT the claim or PERMIT it"),
+        "ru": ("измерение", "оно ПОДПИРАЕТ утверждение или РАЗРЕШАЕТ его"),
+        "de": ("Dimension", "STÜTZT es die Aussage oder ERLAUBT es sie"),
+        "fr": ("dimension", "cela SOUTIENT l'affirmation ou l'AUTORISE"),
+        "es": ("dimensión", "¿SOSTIENE la afirmación o la PERMITE?"),
+        "uk": ("вимір", "воно ПІДПИРАЄ твердження чи ДОЗВОЛЯЄ його"),
+        "he": ("ממד", "האם זה תומך בטענה או מתיר אותה"),
+        "labels": {
+            "en": {"evidence": "evidence (supports)",
+                   "authority": "authority (permits)"},
+            "ru": {"evidence": "опора (подпирает)",
+                   "authority": "разрешение (даёт право)"},
+            "de": {"evidence": "Stütze (belegt)", "authority": "Befugnis (erlaubt)"},
+            "fr": {"evidence": "appui (soutient)", "authority": "autorité (autorise)"},
+            "es": {"evidence": "apoyo (sostiene)", "authority": "autoridad (permite)"},
+            "uk": {"evidence": "опора (підпирає)", "authority": "дозвіл (дає право)"},
+            "he": {"evidence": "תמיכה (מבססת)", "authority": "סמכות (מתירה)"},
+        },
+    },
+    {
+        "key": "ground_kind", "type": "choice", "required": False,
+        "advanced": False, "default": "document",
+        # `search` (2026-11-06, the curator: "берём все пункты"): a search that found NOTHING grounds no "none" and no
+        # "for all" — Pell's x² − 61y² = 1 has no root with 1 <= y <= 10^6 (besides x = 1, y = 0) and still has one (dilemmas/diophantine.py)
+        "options": ["document", "act", "certificate", "row", "search"],
+        "en": ("kind of ground", "a document unless you say otherwise"),
+        "ru": ("вид основания", "документ, если не сказано иное"),
+        "de": ("Art der Grundlage", "ein Dokument, sofern nicht anders gesagt"),
+        "fr": ("type de fondement", "un document, sauf mention contraire"),
+        "es": ("tipo de fundamento", "un documento, salvo que se diga otra cosa"),
+        "uk": ("вид підстави", "документ, якщо не сказано інакше"),
+        "he": ("סוג האסמכתא", "מסמך, אלא אם נאמר אחרת"),
+        "labels": {
+            "en": {"document": "document", "act": "act (nothing to withdraw)",
+                   "certificate": "certificate (expires)",
+                   "row": "another row", "search": "search that found nothing (proves no 'none')"},
+            "ru": {"document": "документ", "act": "акт (отзывать нечего)",
+                   "certificate": "сертификат (истекает)",
+                   "row": "другая строка", "search": "поиск, ничего не нашедший (не доказывает «нет»)"},
+            "de": {"document": "Dokument", "act": "Handlung (nichts zurückzunehmen)", "certificate": "Zertifikat (läuft ab)", "row": "andere Zeile", "search": "Suche ohne Fund (beweist kein „keins“)"},
+            "fr": {"document": "document", "act": "acte (rien à retirer)", "certificate": "certificat (expire)", "row": "autre ligne", "search": "recherche sans résultat (ne prouve aucun « aucun »)"},
+            "es": {"document": "documento", "act": "acto (nada que retirar)", "certificate": "certificado (caduca)", "row": "otra fila", "search": "búsqueda sin hallazgo (no prueba un «ninguno»)"},
+            "uk": {"document": "документ", "act": "акт (відкликати нічого)", "certificate": "сертифікат (спливає)", "row": "інший рядок", "search": "пошук, що нічого не знайшов (не доводить «немає»)"},
+            "he": {"document": "מסמך", "act": "מעשה (אין מה לבטל)", "certificate": "אישור (פג תוקף)", "row": "שורה אחרת", "search": "חיפוש שלא מצא דבר (אינו מוכיח „אין“)"},
+        },
+    },
+    {
+        # THE WORLD'S CLOCK, not the inquiry's. Every other column speaks of
+        # what is known; this one speaks of what STOPS being true. ZTL has
+        # carried the distinction since E25 (`zexpire.py`) and proves it in
+        # `EpochBoundary.lean` — two event kinds, `verify` (a mark resolves,
+        # we learned) and `expire` (earned ground returns to the mark, the
+        # world became different) — but the table had no way to SAY it, so a
+        # dilemma whose whole difficulty is temporal (Protagoras v. Euathlus,
+        # 2026-08-28) had to be staged by hand in Python. Naming the event
+        # here is enough: `expire` sends the value back to the mark, and what
+        # it becomes afterwards is a separate act of verification, not
+        # something this cell may presume.
+        "key": "expires_on", "type": "text", "required": False,
+        "advanced": False,
+        "en": ("expires at", "the name of the event after which this ground "
+               "no longer holds — another row"),
+        "ru": ("истекает при", "имя события, после которого это основание "
+               "больше не держит — другая строка"),
+        "de": ("erlischt bei", "Name des Ereignisses, nach dem diese "
+               "Grundlage nicht mehr trägt — eine andere Zeile"),
+        "fr": ("expire à", "le nom de l'événement après lequel ce fondement "
+               "ne tient plus — une autre ligne"),
+        "es": ("expira en", "el nombre del evento tras el cual este "
+               "fundamento ya no sostiene — otra fila"),
+        "uk": ("спливає при", "ім'я події, після якої ця підстава більше не "
+               "тримає — інший рядок"),
+        "he": ("פג בעת", "שם האירוע שאחריו האסמכתא כבר אינה מחזיקה — שורה אחרת"),
+        "eg": ["court_judgment", "registry_recheck"],
+    },
+    {
+        "key": "value", "type": "text", "required": False, "advanced": False,
+        # "? FOR UNKNOWN" WAS FALSE (29.09, blind cloud test): `?` is the
+        # quantity the question asks for and is SOLVED for; an unknown input
+        # written as `?` came back T EARNED. An unknown input is an interval.
+        "en": ("value", "a number, an interval [0,10], or ? for the quantity the question asks for (it is solved for, not measured); ? in [0,2] searches it in [0,2] (the complete answer there); an unknown input is an interval, e.g. [0,inf]"),
+        "ru": ("величина", "число, интервал [0,10] или ? для искомой величины (её решают, а не измеряют); ? in [0,2] ищет её в [0,2] (полный ответ там); неизвестное входное значение — интервал, например [0,inf]"),
+        "de": ("Wert", "Zahl, Intervall [0,10] oder ? für die gesuchte Größe (sie wird gelöst, nicht gemessen); ? in [0,2] sucht sie in [0,2] (die vollständige Antwort dort); ein unbekannter Eingabewert ist ein Intervall, z. B. [0,inf]"),
+        "fr": ("valeur", "nombre, intervalle [0,10] ou ? pour la grandeur cherchée (elle est résolue, pas mesurée) ; ? in [0,2] la cherche dans [0,2] (la réponse complète là) ; une entrée inconnue est un intervalle, p. ex. [0,inf]"),
+        "es": ("valor", "número, intervalo [0,10] o ? para la magnitud buscada (se resuelve, no se mide); ? in [0,2] la busca en [0,2] (la respuesta completa allí); un dato desconocido es un intervalo, p. ej. [0,inf]"),
+        "uk": ("величина", "число, інтервал [0,10] або ? для шуканої величини (її розв'язують, а не вимірюють); ? in [0,2] шукає її в [0,2] (повна відповідь там); невідоме вхідне значення — інтервал, напр. [0,inf]"),
+        "he": ("ערך", "מספר, תחום [0,10] או ? לגודל המבוקש (פותרים אותו, לא מודדים); ? in [0,2] מחפש אותו ב-[0,2] (התשובה המלאה שם); ערך קלט לא ידוע הוא תחום, למשל [0,inf]"),
+        "eg": ["1500", "[0,10]", "?", "? in [0,2]"],
+    },
+    {
+        "key": "unit", "type": "text", "required": False, "advanced": False,
+        "en": ("unit", "only with a value; metres never meet roubles"),
+        "ru": ("единица", "только с величиной; метры не встречаются с рублями"),
+        "de": ("Einheit", "nur mit einem Wert; Meter treffen nie auf Euro"),
+        "fr": ("unité", "seulement avec une valeur ; les mètres ne rencontrent pas les euros"),
+        "es": ("unidad", "solo con un valor; los metros no se cruzan con los euros"),
+        "uk": ("одиниця", "лише з величиною; метри не зустрічаються з гривнями"),
+        "he": ("יחידה", "רק עם ערך; מטרים לא נפגשים עם שקלים"),
+        "eg": ["RUB", "m", "m2"],
+    },
+    {
+        "key": "scale", "type": "choice", "required": False, "advanced": False,
+        "default": "", "options": ["", "int", "decimal2", "frac3"],
+        "en": ("scale", "what it rounds to"),
+        "ru": ("шкала", "до чего округляем"),
+        "de": ("Skala", "worauf gerundet wird"),
+        "fr": ("échelle", "jusqu'où l'on arrondit"),
+        "es": ("escala", "hasta dónde redondeamos"),
+        "uk": ("шкала", "до чого округлюємо"),
+        "he": ("סולם", "לאן מעגלים"),
+        "labels": {
+            "en": {"": "exact", "int": "whole", "decimal2": "hundredths",
+                   "frac3": "thirds"},
+            "ru": {"": "точно", "int": "целые", "decimal2": "сотые",
+                   "frac3": "трети"},
+            "de": {"int": "ganze", "decimal2": "Hundertstel", "frac3": "Drittel"},
+            "fr": {"int": "entiers", "decimal2": "centièmes", "frac3": "tiers"},
+            "es": {"int": "enteros", "decimal2": "centésimas", "frac3": "tercios"},
+            "uk": {"int": "цілі", "decimal2": "соті", "frac3": "третини"},
+            "he": {"int": "שלמים", "decimal2": "מאיות", "frac3": "שלישים"},
+        },
+    },
+    {
+        "key": "sample", "type": "bool", "required": False, "advanced": True,
+        "default": False,
+        "en": ("separate measurements",
+               "each occurrence is its own act of measuring"),
+        "ru": ("отдельные измерения",
+               "каждое вхождение — свой акт измерения"),
+        "de": ("Einzelmessungen", "eine Zahl aus einer Stichprobe, keine einzelne Messung"),
+        "fr": ("mesures séparées", "un nombre issu d'un échantillon, pas d'une seule mesure"),
+        "es": ("mediciones separadas", "un número de una muestra, no una sola medición"),
+        "uk": ("окремі виміри", "число з вибірки, а не одне вимірювання"),
+        "he": ("מדידות נפרדות", "מספר מתוך מדגם, לא מדידה אחת"),
+    },
+    {
+        # A CONVENTION (2026-11-05, Bertrand's chord, Sleeping Beauty, an outside review): a quantity with no value to
+        # find until one is DECLARED — a probability over a measure nobody named, a unit, a summation method, which
+        # quantity a study asks for. The numeric floor then names the cure "stipulate", never "measure"; NO verdict
+        # changes (ZTL znumjudge, tested both sides). An empirical quantity is never a convention: its value is
+        # measured, and declaring it would be whitewashing.
+        "key": "convention", "type": "bool", "required": False, "advanced": True,
+        "default": False,
+        "en": ("a convention",
+               "no value to find until one is declared (a measure nobody named, a unit, a summation method)"),
+        "ru": ("договорённость",
+               "значения нет, пока его не договорили (неназванная мера, единица, метод суммирования)"),
+        "de": ("eine Konvention", "kein Wert zu finden, bis einer festgelegt wird (ein ungenanntes Maß, eine Einheit)"),
+        "fr": ("une convention", "pas de valeur à trouver tant qu'on n'en fixe pas une (une mesure non nommée, une unité)"),
+        "es": ("una convención", "no hay valor que hallar hasta que se fija uno (una medida sin nombrar, una unidad)"),
+        "uk": ("домовленість", "значення немає, доки його не домовились (неназвана міра, одиниця)"),
+        "he": ("מוסכמה", "אין ערך למצוא עד שקובעים אחד (מידה שלא נקבעה, יחידה)"),
+    },
+    {
+        # ZTL degrees (2026-11-05, the curator's plan): the DEGREE of a statement — the probability that it is true, as a
+        # point or an interval in [0, 1]. Not 'value' (a quantity): a statement has a degree, a quantity a value, and
+        # the two are kept apart as '==' and '<->' are. A degree needs a ground like anything else: on a verified
+        # row it is earned, on an unverified row it is told and whatever rests on it is on credit.
+        "key": "degree", "type": "text", "required": False, "advanced": True,
+        "en": ("degree", "the probability that this statement is true: 0.3, or an interval [0.2, 0.4] when it is "
+                         "only known within bounds; verified = measured, unverified = told"),
+        "ru": ("степень", "вероятность, что это утверждение истинно: 0.3 или интервал [0.2, 0.4], если известна "
+                          "лишь в пределах; проверено — измерена, не проверено — сообщена"),
+        "de": ("Grad", "die Wahrscheinlichkeit, dass diese Aussage wahr ist: 0.3 oder ein Intervall [0.2, 0.4]"),
+        "fr": ("degré", "la probabilité que cet énoncé soit vrai : 0.3, ou un intervalle [0.2, 0.4]"),
+        "es": ("grado", "la probabilidad de que este enunciado sea verdadero: 0.3, o un intervalo [0.2, 0.4]"),
+        "uk": ("ступінь", "ймовірність, що це твердження істинне: 0.3 або інтервал [0.2, 0.4]"),
+        "he": ("דרגה", "ההסתברות שהטענה נכונה: 0.3, או מרווח [0.2, 0.4]"),
+        "eg": ["0.3", "[0.2, 0.4]", "1/3"],
+    },
+]
+
+DOC_FIELDS = [
+    {
+        # РЕЕСТР ЖИВЁТ В ДОКУМЕНТЕ, а не в параметре вызова — и это разница
+        # не удобства, а работоспособности. Ворота оснований существовали с
+        # 27.08 и СПАЛИ ВЕЗДЕ: ни книга, ни студия, ни квитанция реестра не
+        # подавали (промерено 2026-08-28, `inventory/unwired.py`). Защита,
+        # которую надо передать параметром, не передаётся; объявленная В САМОМ
+        # ДОКУМЕНТЕ едет с ним через студию, через сохранение и в отпечаток
+        # квитанции — потому что она часть того, что документ ГОВОРИТ.
+        # Пусто — ворота молчат, и это ВИДНО, а не подразумевается.
+        "key": "grounds", "type": "text", "required": False, "advanced": True,
+        "en": ("admissible grounds",
+               "the grounds this document accepts, comma-separated. A row "
+               "earning on a ground outside the list falls to unverified "
+               "rather than to false. A tier may be given — "
+               "'master:story, perebor:act': story means 'so it was said', "
+               "and what earns on it is marked. Empty: the gate says nothing"),
+        "ru": ("допустимые основания",
+               "основания, которые этот документ признаёт, через запятую. "
+               "Строка, заработавшая на основании вне списка, падает в "
+               "непроверенное, а не в ложь. Можно указать ярус — "
+               "«master:story, perebor:act»: story значит «так сказано», и "
+               "заработавшее на нём будет помечено. Пусто — ворота молчат"),
+        "de": ("zulässige Grundlagen",
+               "kommagetrennt; leer heißt: das Tor schweigt"),
+        "fr": ("fondements admis",
+               "separes par des virgules ; vide : la porte se tait"),
+        "es": ("fundamentos admitidos",
+               "separados por comas; vacio: la puerta calla"),
+        "uk": ("допустимі підстави", "через кому; порожньо — ворота мовчать"),
+        "he": ("אסמכתאות קבילות", "מופרדות בפסיק; ריק — השער שותק"),
+        "eg": ["registry_extract:place, testimony:story",
+               "перебор:act, промер:act, мастер:story"],
+    },
+    {
+        "key": "claim", "type": "formula", "required": False,
+        "en": ("claim", "what you are actually asserting"),
+        "ru": ("утверждение", "что мы, собственно, заявляем"),
+        "eg": ["line <= budget", "rain -> umbrella"],
+        # optional on purpose: a table of self-referential names with no
+        # claim is a perfectly good question — it asks for passports.
+    },
+    {
+        # A BOUND OVER THE WHOLE BOX (2026-10-09, zflcert.py + ZTL zcertify): the studio
+        # searches a certificate within its budget, the kernel checks it exactly.
+        "key": "bounds", "type": "object", "required": False, "advanced": True,
+        "en": ("bounds over the whole box",
+               "up to two objects {\"bound\": \"expression <= number\" (or >=), \"laws\": "
+               "[linear equalities fixing the ? rows], \"tree\": optional certificate}. Interval "
+               "rows are the box. Without a tree the studio searches one; the ZTL kernel checks it "
+               "exactly. CHECKED = holds on the whole box; FAILS = a point where it is false; "
+               "NOT FOUND = nothing claimed either way; REFUSED = with the reason"),
+        "ru": ("границы на всей коробке",
+               "до двух объектов {\"bound\": \"выражение <= число\" (или >=), \"laws\": "
+               "[линейные равенства для строк ?], \"tree\": сертификат, если есть}. Строки-интервалы "
+               "задают коробку. Без дерева студия ищет его сама; ядро ZTL проверяет точно. "
+               "CHECKED — верно на всей коробке; FAILS — точка, где неверно; NOT FOUND — ничего "
+               "не утверждается; REFUSED — с причиной"),
+        "eg": ['{"bound": "VL*I <= 0.6", "laws": ["V - VL = I*Rs", "VL = I*RL"]}'],
+    },
+    {
+        # NAIVE SETS (2026-11-05, ZTL znaive.py): sugar over defined rows — see expand_sets() below.
+        "key": "sets", "type": "object", "required": False, "advanced": True,
+        "en": ("sets",
+               "sets by name, JSON: {\"S\": {\"list\": [names]} | {\"data\": {name: \"T\"|\"F\"|\"Z\"}} | "
+               "{\"abs\": property of x}}. A property is a JSON formula: [\"in\", a, S], [\"not\", f], "
+               "[\"and\"|\"or\"|\"imp\"|\"iff\", f, g], [\"all\"|\"ex\", \"y\", f], [\"eq\", S, T]; it may "
+               "mention any set, itself included. Every set name is also a possible member. Each cell a ∈ S becomes "
+               "a row a_in_S (a property's cell is a defined row), so the claim can say bob_in_Trusted or "
+               "in(bob, Trusted). Claims over the whole universe (all, ex): give {\"sets\": {...}, \"claims\": "
+               "[...]} — judged in the report's sets section"),
+        "ru": ("множества",
+               "множества по именам, JSON: {\"S\": {\"list\": [имена]} | {\"data\": {имя: \"T\"|\"F\"|\"Z\"}} | "
+               "{\"abs\": свойство x}}. Свойство — формула JSON: [\"in\", a, S], [\"not\", f], "
+               "[\"and\"|\"or\"|\"imp\"|\"iff\", f, g], [\"all\"|\"ex\", \"y\", f], [\"eq\", S, T]; оно может "
+               "упоминать любое множество, в том числе само себя. Каждое имя множества — ещё и возможный элемент. "
+               "Каждая клетка a ∈ S становится строкой a_in_S (клетка свойства — определённая строка), и в "
+               "утверждении можно писать bob_in_Trusted или in(bob, Trusted). Утверждения обо всём универсуме "
+               "(all, ex): {\"sets\": {...}, \"claims\": [...]} — их судит раздел отчёта «множества»"),
+        "eg": ['{"a": {"list": []}, "R": {"abs": ["not", ["in", "x", "x"]]}}'],
+    },
+    {
+        # ZTL degrees: the threshold a claim's degree must clear (zdegree.py)
+        "key": "need", "type": "text", "required": False, "advanced": True,
+        "en": ("need", "the probability the claim must have at least, e.g. 0.95: EARNED when its whole degree is at "
+                       "or above it, REFUTED when its whole degree is below, OPEN with what to narrow otherwise"),
+        "ru": ("порог", "вероятность, которую утверждение должно иметь не меньше, например 0.95: заработано, если вся "
+                        "степень не ниже порога, опровергнуто — если вся ниже, иначе открыто и названо, что сузить"),
+        "eg": ["0.95"],
+    },
+    {
+        # ZTL degrees: independence is a STIPULATION (a convention), never a default. All of it (true) or between
+        # GROUPS (2026-11-06, the curator: "да, делай частичную независимость")
+        "key": "independent", "type": "object", "required": False, "advanced": True,
+        "en": ("independent", "stipulate independence — a convention, never a default. true: the claim's statements "
+                              "are all independent of one another. Groups, JSON [[\"a\", \"b\"], [\"c\"]]: the "
+                              "groups are independent of one another, the joint inside a group stays unknown; every "
+                              "statement of the claim in exactly one group (alone, if it is independent of all). "
+                              "Without it every joint is allowed"),
+        "ru": ("независимы", "договориться о независимости — договорённость, не умолчание. true: все утверждения "
+                             "формулы независимы друг от друга. Группы, JSON [[\"a\", \"b\"], [\"c\"]]: группы "
+                             "независимы между собой, связь внутри группы остаётся неизвестной; каждое утверждение "
+                             "формулы — ровно в одной группе (одно, если оно независимо от всех). Без этого "
+                             "допускается любая совместность"),
+        "eg": ["true", "[[\"a\", \"b\"], [\"c\"]]"],
+    },
+    {
+        "key": "ask", "type": "multi", "required": False,
+        "options": ["verdict", "warranty", "passport", "stipulations",
+                    "blast", "brackets"],
+        # NARROWS NOTHING (29.09): read into the document and used by no one —
+        # the report is always whole. Said, rather than promised.
+        "en": ("ask", "reserved: the full report is always shown (this field narrows nothing yet)"),
+        "ru": ("спросить", "зарезервировано: отчёт всегда показывается целиком (поле пока ничего не сужает)"),
+    },
+]
+
+STATUSES = {c["key"]: c for c in COLUMNS}["status"]["options"]
+GROUND_KINDS = {c["key"]: c for c in COLUMNS}["ground_kind"]["options"]
+
+
+def column(key):
+    for c in COLUMNS:
+        if c["key"] == key:
+            return c
+    return None
+
+
+def form_spec(lang="en"):
+    """Everything the UI needs to draw the table, and nothing it has to
+    invent: label, help, widget, options with their labels, whether the
+    cell is required and under what condition."""
+    def render(c):
+        label, help_ = c.get(lang, c["en"])
+        out = {"key": c["key"], "label": label, "help": help_,
+               "help_when": {k: {"help": v.get(lang, v["en"])[0],
+                                 "eg": v.get(lang, v["en"])[1]}
+                             for k, v in (c.get("help_when") or {}).items()},
+               "widget": c["type"], "advanced": c.get("advanced", False),
+               "required": c.get("required", False),
+               "required_when": c.get("required_when"),
+               "default": c.get("default"), "eg": c.get("eg", [])}
+        if c["type"] in ("choice", "multi"):
+            labels = c.get("labels", {}).get(lang, {})
+            out["options"] = [{"value": o, "label": labels.get(o, o)}
+                              for o in c["options"]]
+        s = c.get("suggest")
+        if s:
+            out["suggest"] = {"when_status": s["when_status"],
+                              "prefix": s["prefix"],
+                              "label": s["label"].get(lang, s["label"]["en"]),
+                              "own": s["own"].get(lang, s["own"]["en"])}
+        return out
+    return {"columns": [render(c) for c in COLUMNS],
+            "document": [render(c) for c in DOC_FIELDS],
+            "langs": [{"code": c, "label": n} for c, n, _e in LANGS],
+            "rtl": lang in RTL}
+
+
+# ------------------------------------------------------- validation
+import json
+import os
+import re
+from collections import Counter
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ztlcore'))  # vendored ZTL core
+
+from ztljudge import judge, formalize                            # noqa: E402
+from znumjudge import parse_quantities, judge_sheet_claim        # noqa: E402
+from znumjudge import extract_comparisons                       # noqa: E402
+from znumsolve import solve_claim                                # noqa: E402
+from zread import N
+import zpassport                                                 # noqa: E402
+import zbook                                                     # noqa: E402
+import zbackward                                                 # noqa: E402
+import zbackward_tree                                            # noqa: E402
+import zcertify                                                  # noqa: E402,F401 (zflcert's kernel)
+import znaive                                                    # noqa: E402 (naive sets, 2026-11-05)
+
+NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё_][\w А-Яа-яЁё-]*$")
+
+# ИМЕНА, КОТОРЫЕ РАЗБОР ЛОМАЮТ МОЛЧА. Заведено 2026-09-03 после того, как форк
+# назвал правдоруба буквой T и получил ПУСТОЙ паспорт без единого замечания:
+# не ошибку, а тихо неверный ответ.
+#
+# Список ПРОМЕРЕН, а не перенесён из спеки первого поколения. Там запрещались
+# ещё Tr, imp, xor, xnor — в нынешнем ядре они безвредны и дают тот же разбор,
+# что обычное имя; запрещать их значило бы отнимать у человека слова без
+# причины. Словесные операторы (and, or, not, implies, и, или, не) валидатор
+# и так отвергает по другому правилу. Остаются ровно три:
+#
+#     T -> паспорт ПУСТ,  замечаний 0
+#     F -> паспорт ПУСТ,  замечаний 0
+#     Z -> паспорт INPUT вместо UNDERDETERMINED, замечаний 0
+#
+# Строчные t, f, z безопасны и НЕ запрещены: они разбираются как обычные имена.
+RESERVED_NAMES = ("T", "F", "Z")
+
+# СЛОВА СВЯЗОК — тоже заняты, и хуже того. Найдено проходом introspect
+# 2026-09-04: форк назвал строку `imp` (сокращение от implication), валидатор
+# НЕ СКАЗАЛ НИ СЛОВА, а `run()` упал с KeyError: 'imp'. Причина одна на два
+# места: `names_in` отбрасывает служебные слова, поэтому имя строки `imp` не
+# считается ссылкой — валидатору не на что жаловаться, а окружение оценщика
+# такой строки не заводит. В студии это HTTP 500 на годной с виду таблице.
+#
+# Отличие от T/F/Z по ТЯЖЕСТИ: там читалось не то, здесь ядро ПАДАЕТ.
+# Список ОДИН и живёт здесь; `names_in` берёт его отсюда же, иначе через
+# месяц появится второй, и разойдётся с первым — как уже было с запретом,
+# который стоял в спеке первого поколения и потерялся при переходе на v2.
+OPERATOR_WORDS = ("not", "and", "or", "imp", "xor", "xnor",
+                  "sum", "min", "max", "abs", "sqrt")
+# THE FUNCTIONS OF THE NUMERIC FLOOR (ZTL zfunc 2026-10-10/13, zintegral 2026-10-16; in ZFL 2026-10-20): each a
+# proved bracket of rationals, never a rounding; `pi` is the constant's proved bracket; `integral(f, x, a, b)` the
+# kernel-checked enclosure of a definite integral. Taken here for the same reason as the connectives: a row called
+# `sin` or `pi` would never be bound — the formula reads the function.
+FUNCTION_WORDS = ("exp", "ln", "log10", "sin", "cos", "tan", "atan", "pow", "integral", "pi")
+_SERVICE_WORDS = set(RESERVED_NAMES) | set(OPERATOR_WORDS) | set(FUNCTION_WORDS)
+
+# status -> what the core's two floors each call it
+_MARK = {"verified": "T", "refuted": "F", "unverified": "Z"}
+_PROV = {"verified": "earned", "refuted": "earned", "unverified": "credit"}
+# kind of ground -> the prefix the ledger reads
+_KIND_PREFIX = {"document": "", "act": "performed/",
+                "certificate": "expiring/", "row": "claim/", "search": "search/"}
+
+
+def _issue(level, code, where, hint):
+    return {"level": level, "code": code, "where": where, "hint": hint}
+
+
+# ------------------------------------------------ naive sets (2026-11-05)
+#
+# THE CURATOR'S WORD, 2026-11-05: "we will forget; if it is not in the language we will not use it even when it is
+# needed". So naive sets are IN the language, as sugar over what ZFL already judges: a document may carry `sets`,
+# each a list, a table cell by cell, or a property of x that may mention any set, itself included (ZTL znaive.py,
+# the finite twin of VR/SetsNaive). Every membership cell `a ∈ S` becomes an ordinary row named `a_in_S`:
+#   * a cell of a property set  -> a `defined` row whose ground is the property instantiated at a, constants folded
+#     (the same grounding znaive does) — so the passport office, the judge, the validator and the back-reading treat
+#     it exactly as any self-referential row: Russell's R ∈ R is a PARADOX the same way the Liar is;
+#   * a given cell (list, or data T/F) -> verified / refuted on the ground `set-S` (the document's own list);
+#   * a data cell left Z -> unverified.
+# The claim and the grounds of the person's own defined rows may name a cell as `a_in_S` or `in(a, S)`.
+# The rows are added at the door (coerce), marked `from_sets`, and re-made on every pass, so coercing twice adds
+# nothing twice. What the language does NOT get: a quantifier in the claim — "every key is trusted or not" is a
+# claim over the universe and is judged by znaive itself, in the report's `sets` section (claims given inside
+# `sets` as {"sets": {...}, "claims": [...]}). The universe is finite and the public limits are znaive's own.
+_IN_CALL = re.compile(r"\bin\s*\(\s*([A-Za-zА-Яа-яЁё_][\wА-Яа-яЁё]*)\s*,\s*([A-Za-zА-Яа-яЁё_][\wА-Яа-яЁё]*)\s*\)")
+_SET_NAME = re.compile(r"^[A-Za-zА-Яа-яЁё_][\wА-Яа-яЁё]*$")
+
+
+def in_calls(text):
+    """`in(a, S)` -> `a_in_S`: the readable spelling of a membership cell."""
+    return _IN_CALL.sub(lambda m: f"{m.group(1)}_in_{m.group(2)}", text or "")
+
+
+def sets_universe(field):
+    """The `sets` field as a znaive universe: {name: definition} or {"sets": {...}, "claims": [...]}."""
+    if isinstance(field, dict) and isinstance(field.get("sets"), dict):
+        return {"sets": field["sets"], "claims": field.get("claims") or []}
+    return {"sets": field, "claims": []}
+
+
+def _cell_row_name(cell):
+    a, _, s = cell.partition("∈")
+    return f"{a}_in_{s}"
+
+
+def _ground_text(g):
+    if isinstance(g, str):
+        return g if g in ("T", "F", "Z") else _cell_row_name(g)
+    if g[0] == "not":
+        return "~" + _ground_text(g[1])
+    sym = {"and": "&", "or": "|", "xnor": "<->"}[g[0]]
+    return f"({_ground_text(g[1])} {sym} {_ground_text(g[2])})"
+
+
+def expand_sets(field, own_rows, claim):
+    """The `sets` field -> (rows, refusal). Never raises."""
+    spec = sets_universe(field)
+    if not isinstance(spec["sets"], dict) or not spec["sets"]:
+        return [], "'sets' must be an object {name: {\"list\"|\"data\"|\"abs\": ...}}"
+    bad = [n for n in spec["sets"] if not (isinstance(n, str) and _SET_NAME.match(n)) or n in _SERVICE_WORDS
+           or n in ("sets", "claims", "in") or "_in_" in n]
+    if bad:
+        return [], (f"set names must be plain names (letters, digits, _; not T, F, Z, an operator word, "
+                    f"'in', or containing '_in_'): {bad[:5]}")
+    checked = znaive.check(spec)                  # the door's limits and every unreadable definition, refused
+    if not checked.get("ok"):
+        return [], checked.get("refused") or "the sets cannot be read"
+    u = znaive.Universe(spec)
+    sysm = u.system()
+    rows, want = [], set()
+    for c, g in sysm.items():
+        a, _, s_ = c.partition("∈")
+        if "abs" in spec["sets"][s_]:
+            text = _ground_text(g)
+            rows.append({"name": _cell_row_name(c), "means": f"{a} ∈ {s_} (by the definition of {s_})",
+                         "status": "defined", "ground": text, "from_sets": True})
+            want |= set(re.findall(r"[^\s()~&|<>-]+_in_[^\s()~&|<>-]+", text))
+    for r in own_rows:
+        if r.get("status") == "defined":
+            want |= names_in(r.get("ground") or "")
+    want |= names_in(claim)
+    have = {r["name"] for r in rows}
+    for c, g in sysm.items():
+        n = _cell_row_name(c)
+        a, _, s_ = c.partition("∈")
+        if n in have or n not in want or "abs" in spec["sets"][s_]:
+            continue
+        status = {"T": "verified", "F": "refuted"}.get(g, "unverified")
+        rows.append({"name": n, "means": f"{a} ∈ {s_} (given)", "status": status,
+                     "ground": "" if status == "unverified" else f"set-{s_}", "from_sets": True})
+    clash = sorted({r["name"] for r in rows} & {r.get("name") for r in own_rows})
+    if clash:
+        return [], f"a row of the table has the name of a membership cell: {clash[:5]} — rename the row"
+    return rows, None
+
+
+def coerce(doc):
+    """A document arriving as JSON has JSON's types, not ours: a model that
+    writes `"value": 3000` is not wrong, and neither is a caller who does.
+    Everything below reads cells as text, so cells become text here — once,
+    at the door, rather than defensively in twenty places.
+
+    Found the moment the AI first filled the table (AttributeError: 'int'
+    object has no attribute 'strip'), which is the argument for letting it
+    try rather than only testing by hand."""
+    if not isinstance(doc, dict):
+        return {"rows": [], "claim": ""}
+    # `grounds` проходит ЗДЕСЬ, иначе поле уровня документа теряется в
+    # дверях: coerce строит новый словарь, и всё, что не перечислено, не
+    # доезжает. Ровно так первая редакция реестра-в-документе молча ничего
+    # не делала (промерено 2026-08-28).
+    out = {"claim": _plain_numbers(str(doc.get("claim") or "")),        # 4.5e-05 -> 0.000045, at the door (08.11)
+           "grounds": str(doc.get("grounds") or ""),
+           "ask": doc.get("ask") or [], "rows": []}
+    # A BOUND OVER THE WHOLE BOX, BY CERTIFICATE (zflcert.py, 2026-10-09): passes the door as
+    # it came — an object, or a list of at most MAX_CERTIFICATES of them
+    # (the key is `bounds`, not `certificate`: that word is already a KIND OF GROUND here)
+    # The degrees' two document fields pass the door here, or they are lost in it (the `grounds` lesson above)
+    if doc.get("need") not in (None, ""):
+        out["need"] = str(doc.get("need")).strip()
+    if "independent" in doc:
+        iv = doc.get("independent")
+        if isinstance(iv, str) and iv.strip().startswith("["):
+            try:
+                iv = json.loads(iv)
+            except ValueError:
+                pass                                       # left as text: E_INDEPENDENT names it below
+        if isinstance(iv, list):
+            out["independent"] = iv                        # groups, checked by validate (E_INDEPENDENT)
+        elif isinstance(iv, str) and iv.strip().lower() not in ("true", "yes", "1", "false", "no", "0", ""):
+            out["independent"] = iv                        # unreadable: E_INDEPENDENT, not a silent "no"
+        else:
+            out["independent"] = iv is True or (isinstance(iv, str) and iv.strip().lower() in ("true", "yes", "1"))
+    cert = doc.get("bounds")
+    if isinstance(cert, dict):
+        out["bounds"] = [cert]
+    elif isinstance(cert, list):
+        out["bounds"] = [c for c in cert if isinstance(c, dict)][:MAX_CERTIFICATES]
+    for r in (doc.get("rows") or []):
+        if not isinstance(r, dict) or r.get("from_sets"):
+            continue                          # membership rows are re-made below, never carried over
+        row = {}
+        for k, v in r.items():
+            if k in ("sample", "convention"):
+                row[k] = bool(v)
+            elif k in ("value", "degree") and isinstance(v, (list, tuple)) and len(v) == 2 \
+                    and all(isinstance(e, (int, float, str)) and not isinstance(e, bool) for e in v):
+                # AN INTERVAL WRITTEN AS A JSON ARRAY (2026-11-05: models write [0, "inf"] as often as "[0,inf]";
+                # str() of the list put quotes into the sheet and the row died as unreadable) — the same interval
+                row[k] = "[" + ",".join(str(e).strip() for e in v) + "]"
+            elif v is None:
+                row[k] = ""
+            elif isinstance(v, bool):
+                row[k] = v
+            else:
+                row[k] = str(v)
+        out["rows"].append(row)
+    # NAIVE SETS: membership cells become rows here, at the one door every reader passes (run, validate, backread).
+    sets = doc.get("sets")
+    if sets:
+        out["sets"] = sets                    # kept as given: coerce runs more than once, the refusal must recur
+    if isinstance(sets, str) and sets.strip():
+        try:
+            sets = json.loads(sets)
+        except (ValueError, RecursionError):
+            out["sets_refused"] = "'sets' is not valid JSON"
+            sets = None
+    if sets:
+        out["claim"] = in_calls(out["claim"])
+        for row in out["rows"]:
+            if row.get("status") == "defined":
+                row["ground"] = in_calls(row.get("ground") or "")
+        made, refused = expand_sets(sets, out["rows"], out["claim"])
+        if refused:
+            out["sets_refused"] = refused
+        out["rows"].extend(made)
+    return out
+
+
+MAX_CERTIFICATES = 2    # bounds by certificate per document; MEASURED 2026-10-09: 4 of the worst probed shape took 2.0 s, 2 take ~1 s
+MAX_ATOMS = 10          # REPEATED plain atoms (named twice or more); см. validate()
+MAX_DISTINCT_ATOMS = 64         # all plain atoms; read-once ones cost ~nothing (2026-09-29)
+MAX_COMPARISONS = 16            # distinct comparisons; measured in validate() 2026-09-27
+# THE LENGTH OF A FORMULA IS CAPPED TOO — the atom cap bounds the reading, not
+# the READERS, which are quadratic in the length of the text. MEASURED
+# 2026-09-24: a product chain of one name, 39 KB, took 4.6 s; at 4 KB the
+# worst of seven adversarial shapes (products, differences, quotients,
+# nested roots and brackets) takes 0.21 s. A public service pays per request.
+# 2026-09-27 (the cloud's worst-case search, PR #4): the READING is not linear in
+# the length either — at 4000 characters 8 atoms took 0.49 s and 10 atoms 0.72 s
+# (hill-climbed); at 2000, 0.175 s over 20 variants. 4096 -> 2000.
+MAX_FORMULA_CHARS = 2000
+# EXPIRY EVENTS: each distinct `expires_on` is a crossing the epoch floor reads on
+# both sides; rows are uncapped, so events were (800 events, 126 KB, 76.7 s —
+# PR #4). The floor now judges each distinct reading once, and a document may
+# declare at most this many events.
+MAX_EVENTS = 6
+
+
+def validate(doc):
+    """Machine-readable issues, addressed to a CELL. The repair loop and the
+    form's inline errors read the same list — `where` is `row 2 / ground`
+    rather than a path into a JSON tree, because the person fixing it is
+    looking at a table."""
+    doc = coerce(doc)
+    issues, rows = [], doc["rows"]
+    _cmp_rows = compare_rows(rows)            # ONCE: per row it was O(rows^2) (the robustness check F5 caught it)
+    if doc.get("sets_refused"):
+        issues.append(_issue("error", "E_SETS", "sets", doc["sets_refused"]))
+    if not rows:
+        issues.append(_issue("error", "E_EMPTY", "table",
+                             "the table has no rows"))
+    # КАП НА ЧИСЛЕ АТОМОВ В ФОРМУЛАХ — НЕ на числе строк.
+    #
+    # Это ПУБЛИЧНАЯ студия: запрос приходит от кого угодно. Стоимость разбора
+    # растёт как 3**atoms — ПРОМЕРЕНО 2026-09-18 на `zfl.run`: 8 атомов 0.03 с,
+    # 10 атомов 0.27 с, 12 атомов 2.87 с, 14 атомов 29.6 с, 16 больше минуты.
+    # В тело запроса 256 КБ влезают десятки имён, то есть без предела один
+    # запрос занимает работника на минуты.
+    #
+    # ПОЧЕМУ ПО АТОМАМ, А НЕ ПО СТРОКАМ. Значение формулы зависит ТОЛЬКО от
+    # атомов, которые в ней встречаются (`lean/LabelExact.lean`, `merge_left`).
+    # Промерено: 60 строк с формулой на 6 имён — 0.002 с, а 12 строк с формулой
+    # на 12 имён — 2.87 с. Таблица на сто тысяч строк дешева, пока каждая
+    # формула говорит о немногом; кап по строкам отказал бы ей зря.
+    #
+    # В ядре ZTL этот кап стоит с 2026-09-18 (`e8eea01`), а здесь его не было:
+    # публичная служба работала без него до 2026-09-19. SECURITY-AUDIT.md §40
+    # при этом УТВЕРЖДАЛ, что кап есть. Заявленная защита, которой нет, хуже
+    # честно названного отсутствия.
+    #
+    # A COMPARISON IS A READING ATOM TOO (2026-09-26, the cloud red team, F4).
+    # `x <= 1` is one NAME to `names_in` and one ATOM to the completion table,
+    # so `(x <= 1) ^ (x <= 2) ^ ... ^ (x <= 14)` — one name, 150 bytes —
+    # passed this cap and cost seconds. MEASURED, worst over hash seeds:
+    # 10 plain atoms 0.01 s; 9 atoms with comparisons 0.53 s; 10 comparisons
+    # 2.83 s; 8 comparisons + 2 atoms 8.33 s. So atoms are counted as the core
+    # reads them, and with any comparison present the cap is one lower.
+    _used, _cmps, _seen = set(), set(), Counter()
+    # ONLY FORMULAS (2026-09-26): a ground is a formula only on a `defined` row;
+    # elsewhere it names a witness (`san-guard-filter_var-FILTER_VALIDATE_FLOAT-L48`)
+    # and the core never reads it. Counting its words as atoms refused 1 080 of
+    # introspect's 31 824 SARD documents (11 "atoms", none of them read).
+    for _text in [doc.get("claim") or ""] + [(_r.get("ground") or "") for _r in rows
+                                             if (_r.get("status") or "") == "defined"]:
+        _a, _c = _reading_atoms(_text)
+        _used |= _a
+        _cmps |= _c
+        _seen.update(_reading_atom_counts(_text, _a))
+    # TWO COUNTS, NOT ONE (2026-09-27). The combined cap of 9 was set by the OLD
+    # walk of the grade, whose cost depended on the hash seed; with the grade exact
+    # (PR #2) and the reverse pass capped (PR #4), comparisons are cheap. MEASURED,
+    # worst zfl.run over three shapes (xor chains, mixed connectives, every plain
+    # atom twice) and three seeds, CPU loaded: 16 comparisons + 10 plain atoms
+    # 0.45 s; 20 comparisons 0.58-0.73 s. So plain atoms <= 10, comparisons <= 16.
+    # REPEATED ATOMS, NOT ALL ATOMS (2026-09-29, the curator: "fix the studio's cap").
+    # Since 2026-09-27 the grade is exact without the walk (`zverify._only`: value
+    # sets over independent subtrees, Shannon splits ONLY on atoms that occur more
+    # than once), and E57 (`lean/ZHeredTaut.lean`) shows the hard part is exactly
+    # those repeated atoms. So the 3**atoms bound above is the OLD walk's; a name
+    # said once costs next to nothing. MEASURED today, zfl.run, cap lifted:
+    #   read-once chains (&, mixed & | -> ^ <->), 100 atoms: <= 0.009 s;
+    #   10 repeated atoms in a hard E57 witness + 200 read-once atoms over
+    #   defined rows, 15.5 KB: 0.010 s;
+    #   worst honest case that fits the 2000-character formula cap: guard ->
+    #   ~PHP(6,5) (pigeonhole, unsat, EARNED only by a full proof), 30 repeated
+    #   atoms, 0.66 s; PHP(7,6), 42 atoms, 8.5 s but 3 KB — refused by E_TOOLONG.
+    # So: repeated plain atoms <= 10 (the old number, now on the only part that
+    # costs), all plain atoms <= 64 (a generous ceiling on the table, not on cost).
+    _repeated = {a for a in _used if _seen[a] > 1}
+    if len(_repeated) > MAX_ATOMS:
+        issues.append(_issue("error", "E_TOOBIG", "table",
+                             f"{len(_repeated)} plain atoms occur more than once in the "
+                             f"formulas: the exact guarantee branches on each of them, "
+                             f"so they are capped at {MAX_ATOMS} (atoms named once cost "
+                             f"almost nothing — split the question)"))
+    if len(_used) > MAX_DISTINCT_ATOMS:
+        issues.append(_issue("error", "E_TOOBIG", "table",
+                             f"{len(_used)} plain atoms in the formulas: capped at "
+                             f"{MAX_DISTINCT_ATOMS} (rows are NOT capped — split the question)"))
+    if len(_cmps) > MAX_COMPARISONS:
+        issues.append(_issue("error", "E_TOOBIG", "table",
+                             f"{len(_cmps)} distinct comparisons in the formulas: each is "
+                             f"an atom of the reading, capped at {MAX_COMPARISONS} "
+                             f"— split the question"))
+    for _where, _text in [("claim", doc.get("claim") or "")] + [
+            (f"row {i}", (r.get("ground") or "")) for i, r in enumerate(rows, 1)]:
+        if len(_text) > MAX_FORMULA_CHARS:
+            issues.append(_issue("error", "E_TOOLONG", _where,
+                                 f"{len(_text)} characters: a formula is capped at "
+                                 f"{MAX_FORMULA_CHARS} (reading it costs the square of "
+                                 f"its length) — split the question"))
+    _events = {(r.get("expires_on") or "").strip() for r in rows} - {""}
+    if len(_events) > MAX_EVENTS:
+        issues.append(_issue("error", "E_TOOMANYEVENTS", "table",
+                             f"{len(_events)} expiry events: the epoch floor reads the claim "
+                             f"on both sides of each, so a document may declare at most "
+                             f"{MAX_EVENTS} — split the question"))
+    seen = set()
+    for i, r in enumerate(rows, 1):
+        at = f"row {i}"
+        name = (r.get("name") or "").strip()
+        if not name:
+            issues.append(_issue("error", "E_NONAME", f"{at} / name",
+                                 "every row needs a name"))
+        elif not NAME_RE.match(name):
+            issues.append(_issue("error", "E_BADNAME", f"{at} / name",
+                                 f"'{name}' is not usable in a formula"))
+        elif name in RESERVED_NAMES:
+            issues.append(_issue("error", "E_RESERVED", f"{at} / name",
+                                 f"'{name}' is a constant of the language, not a "
+                                 f"name: used as a row name it silently changes "
+                                 f"the reading. Pick a descriptive name "
+                                 f"(lower-case '{name.lower()}' is free)"))
+        elif name in FUNCTION_WORDS:
+            issues.append(_issue("error", "E_RESERVED", f"{at} / name",
+                                 f"'{name}' is a function of the language, "
+                                 f"not a name: a formula mentioning it reads "
+                                 f"as the function, so the row is never bound. "
+                                 f"Pick a descriptive name"))
+        elif name in OPERATOR_WORDS:
+            issues.append(_issue("error", "E_RESERVED", f"{at} / name",
+                                 f"'{name}' is a connective of the language, "
+                                 f"not a name: a formula mentioning it reads "
+                                 f"as the operator, so the row is never bound "
+                                 f"and the core cannot evaluate it. Pick a "
+                                 f"descriptive name"))
+        elif name in seen:
+            issues.append(_issue("error", "E_DUPNAME", f"{at} / name",
+                                 f"'{name}' is already used above"))
+        seen.add(name)
+
+        if r.get("convention") and r.get("sample"):
+            issues.append(_issue("error", "E_CONVENTION", f"{at} / convention",
+                                 "a convention has one value, and 'separate measurements' makes each occurrence its "
+                                 "own measurement: the two cannot both hold"))
+        elif r.get("convention") and not (r.get("value") or "").strip():
+            issues.append(_issue("error", "E_CONVENTION", f"{at} / convention",
+                                 "'a convention' marks a quantity: give the row a value (an interval for what the "
+                                 "convention could fix), or it changes nothing"))
+        status = (r.get("status") or "").strip()
+        if status not in STATUSES:
+            issues.append(_issue("error", "E_STATUS", f"{at} / status",
+                                 f"status must be one of {STATUSES}"))
+
+        # SCALE — сверять с допустимым, а не глотать молча. Поле объявлено
+        # выбором, но decimalK/fracM параметрические, потому проверяем ФОРМАТ и
+        # границу. Аудит 2026-08-25 показал: без этой проверки decimal5000000
+        # доходил до 10**k и вешал сервер; DoS уже закрыт потолком в znumjudge,
+        # здесь — чтобы кривой scale ПОМЕЧАЛСЯ, а не тихо игнорировался.
+        scale = (r.get("scale") or "").strip()
+        if scale and scale not in ("int",):
+            import re as _re
+            m = _re.fullmatch(r"(decimal(\d+)|frac(\d+))", scale)
+            bad_scale = True
+            if not m:
+                issues.append(_issue("error", "E_SCALE", f"{at} / scale",
+                    "scale must be empty, int, decimalK or fracM"))
+            elif m.group(2) is not None and int(m.group(2)) > 30:
+                issues.append(_issue("error", "E_SCALE", f"{at} / scale",
+                    f"decimal places capped at 30 (got {m.group(2)})"))
+            elif m.group(3) is not None and (int(m.group(3)) < 1 or int(m.group(3)) > 10**9):
+                issues.append(_issue("error", "E_SCALE", f"{at} / scale",
+                    "frac denominator must be between 1 and 1e9"))
+            else:
+                bad_scale = False        # scale ЗАКОННЫЙ — проверять строку дальше
+            # ПРЫГАЕМ ТОЛЬКО ЧЕРЕЗ СЛОМАННЫЙ scale, а не через всякий.
+            # Дыра, промеренная 2026-08-27: `continue` стоял на уровне всей
+            # ветки, поэтому строка с ЗАКОННЫМ `decimal2` пропускала остаток
+            # проверок — и `verified` БЕЗ ОСНОВАНИЯ проходил чисто. То есть
+            # одна необязательная клетка отключала центральное правило языка.
+            if bad_scale:
+                continue
+        # ONLY GROUND CAN EXPIRE — the same precondition `zexpire.expire`
+        # asserts. A mark has nothing to lose, and a sentence is not held by
+        # a clock; declaring either as expiring would let the report stage a
+        # crossing that the event layer refuses to take.
+        exp = (r.get("expires_on") or "").strip()
+        if exp and status not in ("verified", "refuted"):
+            # The quoting here is deliberately dull: a nested same-quote
+            # f-string parses on 3.12 and is a SyntaxError on the 3.11 that
+            # CI runs, and a local `ast.parse` will not tell you (measured
+            # 2026-08-28 — the stand went red on push, not here).
+            shown = status or "empty"
+            issues.append(_issue(
+                "error", "E_EXPIRY_NO_GROUND", f"{at} / expires_on",
+                "only earned ground can expire: this row is "
+                f"'{shown}', and there is nothing for the clock "
+                "to take back"))
+        ground = (r.get("ground") or "").strip()
+        if status in ("verified", "refuted", "defined") and not ground:
+            # NAMES THE EXIT, not just the rule. Reported live: two atoms
+            # marked verified for a toy `rain -> umbrella` produced two
+            # refusals and no way forward — the message stated the law and
+            # left the reader to guess the move. Both moves are legitimate,
+            # and the second one is the doctrine rather than a loophole: a
+            # supposition IS a ground once it is named, because then it is
+            # visible and can be withdrawn. What the machine refuses is an
+            # ANONYMOUS stipulation, never a declared one.
+            issues.append(_issue("error", "E_NOGROUND", f"{at} / ground",
+                                 "'verified', 'refuted' and 'defined' need a "
+                                 "ground. Either name what backs it — a "
+                                 "supposition counts once it is named, e.g. "
+                                 "by-assumption — or set the status to "
+                                 "'not verified'"))
+        # A GROUND IS AN IDENTIFIER. The sheet is space-separated, so a
+        # ground with a space is silently CUT — and a ground's whole job is
+        # identity, which makes a truncated one a different document that
+        # happens to look right. Seen live: "утверждение пользователя"
+        # became the ground "утверждение".
+        if status in ("verified", "refuted") and re.search(r"[\s,]", ground):
+            issues.append(_issue(
+                "error", "E_GROUND_SPACES", f"{at} / ground",
+                "a ground is one word — it names a document, and a space "
+                "would cut the name in half: write the-story or inv-17"))
+        dim = (r.get("dimension") or "evidence").strip()
+        if dim not in ("evidence", "authority"):
+            issues.append(_issue("error", "E_DIM", f"{at} / dimension",
+                                 "dimension must be evidence or authority"))
+        kind = (r.get("ground_kind") or "document").strip()
+        if dim == "authority" and kind not in ("document", ""):
+            issues.append(_issue(
+                "error", "E_DIM_CLASH", f"{at} / dimension",
+                "a ground carries one mark, not two: 'authority' cannot be "
+                "combined with an act, a certificate or another row. Say "
+                "which one matters more and use that"))
+        if kind not in GROUND_KINDS:
+            issues.append(_issue("error", "E_KIND", f"{at} / kind of ground",
+                                 f"kind must be one of {GROUND_KINDS}"))
+        if status == "verified" and kind == "search":
+            issues.append(_issue(
+                "warn", "W_SEARCH_NOT_PROOF", f"{at} / kind of ground",
+                "a search that found nothing proves no 'none' and no 'for all': the row is read as not verified. "
+                "Prove it (a document or a proof as ground), or write the bound the search covered into the row "
+                "('no root with y <= 10^6') and ground THAT"))
+        if (r.get("degree") or "").strip():
+            try:
+                parse_degree(r["degree"])
+                if status in ("refuted", "defined"):
+                    raise ValueError("a degree belongs on a verified (measured) or unverified (told) statement — "
+                                     f"not on a {status} row")
+                if (r.get("value") or "").strip():
+                    raise ValueError("a row with a value is a quantity; a degree belongs to a statement")
+            except ValueError as exc:
+                issues.append(_issue("error", "E_DEGREE", f"{at} / degree", str(exc)))
+        if status == "defined" and r.get("name") in _cmp_rows:
+            if expand_compares(r.get("name") or "", rows)[1]:
+                issues.append(_issue("error", "E_COMPARE_ROW", f"{at} / ground",
+                                     "this comparison leads back to itself through its own name: a comparison is "
+                                     "read where its name stands, and here there is nothing to read"))
+        elif status == "defined":
+            try:
+                _formula_prop(ground)
+            except Exception as exc:
+                issues.append(_issue("error", "E_FORMULA",
+                                     f"{at} / ground", str(exc)))
+            _leans = (names_in(ground) & set(_cmp_rows)) if _cmp_rows else set()
+            if _leans:
+                issues.append(_issue("error", "E_COMPARE_ROW", f"{at} / ground",
+                                     f"this definition leans on the comparison row(s) {sorted(_leans)}: definitions are "
+                                     f"read by the passport office, which reads statements; use the comparison in "
+                                     f"the claim instead"))
+        # THE SHAPE OF A VALUE, answered at the cell rather than by a parse
+        # error. `(0,10)` and `{0,10}` are the two a person reaches for
+        # next after `[0,10]`, and the floor accepts neither — but
+        # "cannot parse sheet entry: 'x=(0'" is not an answer to anybody.
+        val = (r.get("value") or "").strip()
+        if val:
+            if re.match(r"^[(\[]\s*[-\d.]+\s*,\s*[-\d.]+\s*[)\]]$", val) \
+                    and not re.match(r"^\[[^,]+,[^,]+\]$", val):
+                issues.append(_issue(
+                    "error", "E_OPEN_INTERVAL", f"{at} / value",
+                    "an open bound is not part of a value here: write the "
+                    "closed interval [0,10], or put the strictness in the "
+                    "claim — `x > 0 & x < 10`"))
+            elif val.startswith("{"):
+                issues.append(_issue(
+                    "error", "E_VALUE_SET", f"{at} / value",
+                    "a choice between separate values is not a quantity: "
+                    "give each its own row, or write the interval that "
+                    "covers them"))
+            elif is_question(val) and val != "?" and question_region(val) is None:
+                issues.append(_issue(
+                    "error", "E_VALUE_FORM", f"{at} / value",
+                    f"a search region is `? in [a, b]` with two numbers, a < b — '{val}' is not one"))
+            elif not is_question(val) and not re.match(r"^(\?|\[[^\]]+\]|[-\d][\d.,/eE+-]*)$", val):
+                issues.append(_issue(
+                    "error", "E_VALUE_FORM", f"{at} / value",
+                    "a value is a number, an interval [0,10], ?, or ? in [a, b] — "
+                    f"'{val}' is none of them"))
+        # an unreadable unit is an answer at the cell, not an exception
+        # thrown from three modules down
+        unit = (r.get("unit") or "").strip()
+        if unit:
+            try:
+                import znum
+                znum._unit_map(unit)
+            except Exception:
+                issues.append(_issue(
+                    "error", "E_UNIT", f"{at} / unit",
+                    f"'{unit}' cannot be read as a unit: a word, optionally "
+                    f"with a power (m2), joined by · or /"))
+        if r.get("unit") and not (r.get("value") or "").strip():
+            issues.append(_issue("warn", "W_UNIT_NO_VALUE",
+                                 f"{at} / unit",
+                                 "a unit with no value says nothing"))
+        if not (r.get("means") or "").strip():
+            issues.append(_issue("warn", "W_NO_GLOSS", f"{at} / means",
+                                 "without a gloss nobody can check that the "
+                                 "name means what it seems to"))
+    declared = {(r.get("name") or "").strip() for r in rows}
+    for i, r in enumerate(rows, 1):
+        # The table is a closed world for events too: an event nobody
+        # declared cannot be staged, and a silent unknown here would print a
+        # crossing that never happens.
+        ev = (r.get("expires_on") or "").strip()
+        if ev and ev not in declared:
+            issues.append(_issue(
+                "error", "E_UNKNOWN_NAME", f"row {i} / expires_on",
+                f"no row is called ['{ev}'] — an event is a row like any "
+                f"other name"))
+    for i, r in enumerate(rows, 1):
+        if (r.get("status") or "") == "defined":
+            unknown = names_in(r.get("ground")) - declared
+            if unknown:
+                issues.append(_issue(
+                    "error", "E_UNKNOWN_NAME", f"row {i} / ground",
+                    f"no row is called {sorted(unknown)}"))
+    if (doc.get("need") or "").strip():
+        try:
+            parse_degree(doc["need"])
+        except ValueError as exc:
+            issues.append(_issue("error", "E_NEED", "need", str(exc)))
+    _ig = doc.get("independent")
+    if isinstance(_ig, list):
+        _names = {r.get("name") for r in rows}
+        _seen = set()
+        for _g in _ig:
+            if not (isinstance(_g, list) and _g and all(isinstance(x, str) for x in _g)):
+                issues.append(_issue("error", "E_INDEPENDENT", "independent",
+                                     "groups are a list of non-empty lists of row names, e.g. [[\"a\", \"b\"], [\"c\"]]"))
+                break
+            for x in _g:
+                if x not in _names:
+                    issues.append(_issue("error", "E_INDEPENDENT", "independent", f"no row is called {x!r}"))
+                elif x in _seen:
+                    issues.append(_issue("error", "E_INDEPENDENT", "independent",
+                                         f"{x!r} is in two groups: a statement belongs to one group"))
+                _seen.add(x)
+    elif isinstance(_ig, str) and _ig.strip():
+        issues.append(_issue("error", "E_INDEPENDENT", "independent",
+                             "write true, or groups as JSON: [[\"a\", \"b\"], [\"c\"]]"))
+    _spelt = _spell((doc.get("claim") or "").strip())
+    for pat, sym in _WORDS:
+        _spelt = re.sub(pat, sym, _spelt)
+    if any(k == "mixed" for _p, k in eq_kinds(_spelt, rows)):
+        issues.append(_issue("error", "E_TYPE_EQ", "claim",
+                             "a statement is set equal to a number with `=`: no reading makes a truth value equal to a "
+                             "number. If the statement's row is a quantity, give it a value; if you meant 'the same "
+                             "truth value as', compare it with a statement (p = (x > 1)); for numbers write =="))
+    claim = normalise((doc.get("claim") or "").strip(), rows)
+    if claim and _COMPARES.search(claim) and any((r.get("expires_on") or "").strip() for r in rows):
+        issues.append(_issue("warn", "W_EPOCH_NUMERIC", "claim",
+                             "the time layer reads statements only: this claim compares numbers, so whether it "
+                             "survives a clock running out is not judged here — the rest of the report stands"))
+    if claim:
+        try:
+            phi = _formula(claim, {r.get("name"): r for r in rows})
+        except Exception as exc:
+            # A LONE `=` STAYS LOGICAL where no row has a value (`normalise`),
+            # so `x*x - 2*x + 5 = 0` over value-less rows dies in the
+            # propositional parser as "stray character '*'". When the equation
+            # reading explains the failure, say THAT: which row needs a value.
+            issues.extend(_numbers_without_value(_LONE_EQ.sub("==", claim), rows)
+                          or [_issue("error", "E_CLAIM", "claim", str(exc))])
+        else:
+            numeric = isinstance(phi, tuple) and phi[:1] == ("comparison",)
+            if numeric:
+                issues.extend(_numbers_without_value(phi[1], rows))
+            issues.extend(_numbers_as_statements(phi[1] if numeric else claim, rows))
+        unknown = names_in(claim) - declared
+        if unknown:
+            issues.append(_issue("error", "E_UNKNOWN_NAME", "claim",
+                                 f"no row is called {sorted(unknown)}"))
+    for where, text in [("claim", claim)] + [
+            (f"row {i} / ground", r.get("ground")) for i, r in enumerate(rows, 1)
+            if (r.get("status") or "") == "defined"]:
+        clash = bound_names(text) & declared
+        if clash:
+            issues.append(_issue(
+                "error", "E_BOUNDVAR", where,
+                f"the variable of integration {sorted(clash)} is also a row: inside "
+                f"integral(f, x, a, b) the x runs over [a, b] and is not the row — "
+                f"give it a letter of its own"))
+    return issues
+
+
+def _numbers_without_value(text, rows):
+    """A NAME READ AS A NUMBER NEEDS A NUMBER. Inside a comparison every name
+    is a quantity; a row with no value is not one, and no instrument can read
+    the claim. Until 2026-09-24 the validator waved every comparison through
+    (`_formula` hands it to the sheet judge) and the run refused it later.
+
+    MEASURED 2026-09-24 on the live studio: three questions in prose (two
+    Russian, one English), all translated correctly to `x*x - 2*x + 5 == 0`,
+    and in all three the model left the sought x without a value instead of
+    `?`. `validate` returned nothing, so the translator's repair loop, which
+    runs on these issues, never ran; the person saw E_UNREADABLE "stray
+    character '*'". The issue now names the cell and the cure, and the repair
+    loop can apply it.
+
+    The comparisons are found by `extract_comparisons`, the sheet judge's own
+    splitter, not by a copy of its pattern: a rule written twice drifts, and
+    between `zfl` and the judge that has already cost a day. A name used
+    only as a propositional atom beside a comparison is not touched."""
+    by_name = {}
+    for i, r in enumerate(rows, 1):
+        name = (r.get("name") or "").strip()
+        if name:
+            by_name.setdefault(name, (i, r))
+    # NOTHING TO FIND, NOTHING TO PAY. MEASURED 2026-09-24 on the
+    # 2040-factor claim of the public-service stand: reading the sides made
+    # validate 0.00 s -> 0.5 s. The splitter now runs with `parse=False`,
+    # which only finds the comparisons, and not at all when every name the
+    # claim mentions has a value.
+    valueless = {n for n, (_i, r) in by_name.items()
+                 if not (r.get("value") or "").strip()}
+    if not (names_in(text) & valueless):
+        return []
+    try:
+        _core, atoms = extract_comparisons(text, {}, parse=False)
+    except Exception:
+        return []                # malformed arithmetic: the run says it in its own words
+    used = set()
+    for _kind, _e1, _e2, chunk in atoms.values():
+        used |= names_in(chunk)
+    out = []
+    for name in sorted(used & set(by_name)):
+        i, r = by_name[name]
+        if not (r.get("value") or "").strip():
+            out.append(_issue(
+                "error", "E_NO_VALUE", f"row {i} / value",
+                f"'{name}' is read as a number in the claim, and it has no "
+                f"value: give it a number, an interval [0,10], or ? if "
+                f"'{name}' is what the question asks for"))
+    return out
+
+
+def _numbers_as_statements(text, rows):
+    """A NUMBER IS NOT A STATEMENT. A row with a value is a quantity; it
+    enters a claim through a comparison, and a name of one that stands where
+    a statement goes (beside ^ & | ~ -> <->, or alone) is a type error, not a
+    proposition with an unknown mark.
+
+    MEASURED 2026-09-24 with a live model: a question in prose came back as
+    `x^2 - 2*x + 5 == 0`. `^` is XOR here, so the claim was read as
+    "x XOR (2 - 2*x + 5 == 0)" and answered OPEN, silently; with x = 2
+    measured, `x^2 == 4` and `x^2 == 5` both came back OPEN. The issue names
+    the name and the cure, and the repair loop can apply it."""
+    numbers = {}
+    for r in rows:
+        name = (r.get("name") or "").strip()
+        if name and (r.get("value") or "").strip():
+            numbers[name] = True
+    if not (names_in(text) & set(numbers)):
+        return []
+    try:
+        core, _atoms = extract_comparisons(text, {}, parse=False)
+    except Exception:
+        return []                # the splitter's own refusal: the run says it
+    return [_issue(
+        "error", "E_NUMBER_AS_STATEMENT", "claim",
+        f"'{name}' has a value, so it is a number, and here it stands where a "
+        f"statement goes. A number enters a claim through a comparison "
+        f"(`{name} > 0`); a square is `{name}*{name}`, because `^` is XOR, a "
+        f"connective of statements")
+        for name in sorted(names_in(core) & set(numbers))]
+
+
+def _reading_atoms(text):
+    """(plain names, comparisons) as the completion table reads a formula: a
+    comparison is ONE atom however many names it mentions, and a name used
+    only inside comparisons is not an atom of its own. Found by the judge's
+    own splitter (a rule written twice drifts); only when the text could hold
+    a comparison, so a table of plain grounds pays nothing."""
+    if not re.search(r"[<>]|==|!=|(?<![<>=!])=(?!=)", text or ""):
+        return names_in(text), set()
+    try:
+        core, atoms = extract_comparisons(text, {}, parse=False)
+    except Exception:
+        return names_in(text), set()
+    return ({n for n in names_in(core) if n not in atoms},
+            {" ".join(v[3].split()) for v in atoms.values()})
+
+
+def _reading_atom_counts(text, atoms):
+    """How many times each plain reading atom is NAMED in one formula — the count
+    the repeated-atom cap reads. `atoms` comes from `_reading_atoms`, so a name used
+    only inside comparisons is not counted here either."""
+    t = re.sub(r"\bTr\s*\(\s*([^)]+?)\s*\)", r"\1", text or "")
+    return Counter(w for w in re.findall(r"[A-Za-zА-Яа-яЁё_][\wА-Яа-яЁё]*", t) if w in atoms)
+
+
+def names_in(text):
+    """Every name a formula mentions. A table is a closed world: a formula
+    may only speak of rows that exist, and a typo in a name is the commonest
+    way to ask a question about nothing at all. The variable of an integral
+    is not a row: `integral(f, x, a, b)` binds x inside f (`bound_names`)."""
+    t = re.sub(r"\bTr\s*\(\s*([^)]+?)\s*\)", r"\1", text or "")
+    words = set(re.findall(r"[A-Za-zА-Яа-яЁё_][\wА-Яа-яЁё]*", t))
+    return {w for w in words if w not in _SERVICE_WORDS} - bound_names(text)
+
+
+_INTEGRAL_RE = re.compile(r"\bintegral\s*\(")
+
+
+def bound_names(text):
+    """The variables of integration in a formula: the second argument of every
+    `integral(f, x, a, b)`."""
+    text, out = text or "", set()
+    for m in _INTEGRAL_RE.finditer(text):
+        depth, start, args = 1, m.end(), []
+        for i in range(m.end(), len(text)):
+            c = text[i]
+            if c in "([":
+                depth += 1
+            elif c in ")]":
+                depth -= 1
+                if depth == 0:
+                    args.append(text[start:i])
+                    break
+            elif c == "," and depth == 1:
+                args.append(text[start:i])
+                start = i + 1
+        if len(args) >= 2 and re.fullmatch(r"\s*[A-Za-z_]\w*\s*", args[1]):
+            out.add(args[1].strip())
+    return out
+
+
+_LONE_EQ = re.compile(r"(?<![<>=!])=(?!=)")
+
+
+# The connectives people (and models) actually type. `and` is not a second
+# operator, it is the same one spelled out — refusing it teaches nobody
+# anything and costs an answer. Found when the model wrote
+# "M = start - toV - give and P = give" and the arithmetic reader choked.
+_WORDS = [(r"\band\b", "&"), (r"\bи\b", "&"),
+          (r"\bor\b", "|"), (r"\bили\b", "|"),
+          (r"\bnot\b", "~"), (r"\bне\b", "~"),
+          (r"\bimplies\b", "->")]
+
+
+def _spell(text):
+    """НАПИСАНИЯ одного оператора — в ОДНОМ месте, а не в каждом разборщике.
+
+    `<->` это третье написание эквиваленции (`↔`, `=`), и ему нужен отдельный
+    ход по нежданной причине: `normalise` ниже превращает одинокий `=` в `==`
+    там, где в таблице есть числа. То есть в числовом документе `=` уже занят
+    равенством, и `<->` остаётся ЕДИНСТВЕННЫМ способом написать эквиваленцию.
+    Пока он не читался, логическая эквиваленция была недоступна всякому, кто
+    положил в таблицу хоть одно число — а справка студии называла `<->`
+    законным оператором. Форма проходила зелёной, вердикта не было.
+
+    Почему одной функцией на все входы. Формульный текст приходит ТРЕМЯ
+    дорогами: `normalise` (claim), `_formula` (ground), `_formula_prop`
+    (ground у defined-строки). Правило, записанное трижды, разойдётся —
+    это уже случилось между `zfl` и судьёй и стоило дня.
+
+    Промерено 2026-09-21: до правки claim `a <-> b` в документе С ЧИСЛАМИ
+    умирал с «stray character '<'», а такой же БЕЗ чисел проходил."""
+    return (text or "").replace("<->", "↔")
+
+
+# A LONE `=` IS READ BY THE TYPES OF ITS TWO SIDES (2026-11-05, the curator's "по типам сторон").
+#
+# `=` means "the same value": between two numbers, numeric equality (`x - 10 = 20`); between two statements, the same
+# TRUTH value — the biconditional, which IS equality of truth values (`p = q`, `p = (x > 1)`). The kind of value is
+# known from the rows: a row with a value is a number, a row without one is a statement, a comparison or a connective
+# makes a statement. Before, the reading was chosen per DOCUMENT: any row with a value turned every lone `=` numeric,
+# so `p = q` between two statements died with "p is read as a number" the moment an unrelated quantity was added —
+# the meaning of a symbol changed with a row it does not mention (two of six documents of a blind formalization
+# audit died on it). `==` and `<->` stay the explicit forms; the mathematical and the logical equality stay apart —
+# the TYPES decide which one is meant, not the neighbourhood.
+#   both sides numeric      -> `==`  (binds as an equation: `x - 10 = 20 & ok` is `(x - 10 == 20) & ok`)
+#   both sides statements   -> `=`   (the core's biconditional, the weakest binding)
+#   a statement = a number  -> refused by form, E_TYPE_EQ: no reading equates a truth value with a number
+#   anything not decidable  -> the old per-document rule (an unknown name, arithmetic on a statement such as an
+#                              equation over value-less rows — whose own error already says which row needs a value)
+_EQ_TOK = re.compile(r"\s*(->|↔|<=|>=|==|!=|[&|~^=<>+\-*/(),\[\]]|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z_0-9]*|\S)")
+_EQ_LOGIC = {"&", "|", "~", "^", "↔", "->", "=", "==", "!=", "<", ">", "<=", ">="}
+_EQ_ARITH = {"+", "-", "*", "/", ",", "[", "]"}
+_EQ_NUMFUN = set(FUNCTION_WORDS) | {"sum", "sqrt", "min", "max", "abs"}
+
+
+def _eq_tokens(text):
+    toks, i = [], 0
+    while i < len(text):
+        m = _EQ_TOK.match(text, i)
+        if not m or m.end() == i:
+            break
+        toks.append((m.group(1), m.start(1)))
+        i = m.end()
+    return toks
+
+
+def _eq_side(toks, i, step, rows):
+    """the operand of the `=` at token i, scanned leftward (step -1) or rightward (+1) up to an unmatched bracket or a
+    top-level connective/comparison; -> 'numeric' | 'statement' | 'unknown'"""
+    open_, close = ("(", ")") if step > 0 else (")", "(")
+    side, depth, j = [], 0, i + step
+    while 0 <= j < len(toks):
+        t = toks[j][0]
+        if t == open_:
+            depth += 1
+        elif t == close:
+            if depth == 0:
+                break
+            depth -= 1
+        elif depth == 0 and t in _EQ_LOGIC:
+            break
+        side.append(t)
+        j += step
+    if not side:
+        return "unknown"
+    names = [t for t in side if re.match(r"[A-Za-z_]", t)]
+    if any(t in _EQ_LOGIC for t in side) or any(n in RESERVED_NAMES for n in names):
+        return "statement"                          # a comparison or a connective inside brackets, or T/F/Z
+    valued = {r.get("name") for r in rows if (r.get("value") or "").strip()}
+    plain = {r.get("name") for r in rows if r.get("name") and not (r.get("value") or "").strip()}
+    arith = any(t in _EQ_ARITH or re.match(r"\d", t) for t in side)
+    stmt = [n for n in names if n in plain]
+    if any(n not in valued and n not in plain and n not in _EQ_NUMFUN for n in names):
+        return "unknown"                            # a name the table does not have: its own error says so
+    if stmt:
+        return "statement" if not arith and len(names) == len(stmt) else "unknown"
+    return "numeric" if (arith or names) else "unknown"
+
+
+def eq_kinds(text, rows):
+    """[(position in text, 'numeric' | 'statement' | 'mixed' | 'unknown')] for every lone `=` in a SPELLED claim"""
+    toks = _eq_tokens(text)
+    out = []
+    for i, (t, pos) in enumerate(toks):
+        if t != "=":
+            continue
+        a, b = _eq_side(toks, i, -1, rows), _eq_side(toks, i, +1, rows)
+        if a == b and a in ("numeric", "statement"):
+            out.append((pos, a))
+        elif {a, b} == {"numeric", "statement"}:
+            out.append((pos, "mixed"))
+        else:
+            out.append((pos, "unknown"))
+    return out
+
+
+# A COMPARISON CAN BE NAMED (2026-11-05, the curator's "да"; a blind formalization wanted
+# `A_better_small` defined as `sA/nA > sB/nB` and the language refused it — a defined row was propositional only).
+# A `defined` row whose ground compares numbers is a NAME for that comparison: wherever the claim says the name, the
+# comparison is read, exactly as if it had been written there. Nothing else changes — a document that names no
+# comparison reads as before, and such a document used to be refused (E_FORMULA), so no earlier verdict moves.
+# Limits, refused by form (E_COMPARE_ROW): a comparison row that leads back to itself (no reading — nothing to expand
+# into), and a propositional definition (the self-reference system) that leans on a comparison row (the passport
+# office reads statements; the numbers are the numeric floor's).
+def _spelt_ground(text):
+    t = _spell(text or "")
+    for pat, sym in _WORDS:
+        t = re.sub(pat, sym, t)
+    return t
+
+
+def compare_rows(rows):
+    """{name: ground} for every defined row whose ground compares numbers"""
+    return {r["name"]: r.get("ground") or "" for r in rows
+            if r.get("name") and (r.get("status") or "") == "defined" and _COMPARES.search(_spelt_ground(r.get("ground")))}
+
+
+def _name_re(name):
+    return re.compile(r"(?<![A-Za-z_0-9])" + re.escape(name) + r"(?![A-Za-z_0-9])")
+
+
+def expand_compares(text, rows):
+    """the text with every comparison row's name replaced by its comparison, bracketed; -> (text, looped?)"""
+    cmp = compare_rows(rows)
+    if not cmp:
+        return text, False
+    for _ in range(len(cmp) + 1):
+        hit = False
+        for name, ground in cmp.items():
+            if _name_re(name).search(text):
+                text = _name_re(name).sub(lambda _m, g=ground: f"({g})", text)
+                hit = True
+        if not hit:
+            return text, False
+    return text, True                                        # still names after len+1 rounds: a loop
+
+
+def normalise(claim, rows):
+    """`x - 10 = 20` is what a person writes, and it is not wrong; nor is `p = q`. Each lone `=` is read by the types
+    of its two sides (see above); only an undecidable one falls back to the old rule — numeric where the document
+    has quantities, the biconditional elsewhere. A named comparison is read where its name stands."""
+    out = _spell(expand_compares(claim, rows)[0])
+    for pat, sym in _WORDS:
+        out = re.sub(pat, sym, out)
+    legacy_numeric = bool(numeric_rows(rows))
+    kinds = eq_kinds(out, rows)
+    for pos, kind in sorted(kinds, reverse=True):          # right to left: earlier positions stay valid
+        if kind == "numeric" or (kind in ("mixed", "unknown") and legacy_numeric):
+            out = out[:pos] + "==" + out[pos + 1:]
+    return out
+
+
+def _formula_prop(text):
+    """A DEFINED row's ground is always propositional, so `=` there is the
+    biconditional and never a numeric comparison. Reading it as a comparison
+    is how converting the docket's own examples first crashed the fixed
+    point with KeyError('comparison')."""
+    t = re.sub(r"\bTr\s*\(\s*([^)]+?)\s*\)", r"\1", _spell(text))
+    for pat, sym in _WORDS:
+        t = re.sub(pat, sym, t)
+    return formalize(t)
+
+
+def _formula(text, _names):
+    """One infix syntax for the whole language: `~a & b -> c`, `Tr(L)`, and
+    comparisons `x <= y` where the numeric floor takes over. Tr() is folded
+    to a bare reference here — self-reference is a property of the GROUND
+    being a formula over names, not a separate operator the reader has to
+    know."""
+    # `_spell` ПЕРВЫМ: иначе регулярка ниже видит `<` внутри `<->` и уводит
+    # ЛОГИЧЕСКУЮ эквиваленцию в ЧИСЛОВОЙ путь — не отказ, а молчаливая
+    # подмена маршрута, худший вид ошибки.
+    t = re.sub(r"\bTr\s*\(\s*([^)]+?)\s*\)", r"\1", _spell(text))
+    for pat, sym in _WORDS:
+        t = re.sub(pat, sym, t)
+    if re.search(r"(<=|>=|==|<|>)", t):
+        return ("comparison", t)          # the sheet judge parses these
+    return formalize(t)
+
+
+# ------------------------------------------------- the table, into the core
+#
+# Nothing here decides WHICH question is being asked. Each converter simply
+# reports whether it has anything to say about this table, and `run` calls
+# the ones that do. That is what "the genre is computed" means in code.
+
+def _witness(row):
+    kind = (row.get("ground_kind") or "document").strip() or "document"
+    # One prefix per ground, never two — the ledger accepts `authority/x` or
+    # `expiring/x` and not `authority/expiring/x`. The clash is refused in
+    # `validate` with the reason, rather than silently resolved here in favour
+    # of whichever branch happens to run first.
+    if (row.get("dimension") or "evidence").strip() == "authority":
+        return "authority/" + (row.get("ground") or "").strip()
+    return _KIND_PREFIX.get(kind, "") + (row.get("ground") or "").strip()
+
+
+def numeric_rows(rows):
+    return [r for r in rows if (r.get("value") or "").strip()]
+
+
+_QUESTION_RE = re.compile(r"^\?\s*(?:in\s*(\[[^\]]+\]))?$")
+
+
+def is_question(value):
+    """`?` — the quantity the question asks for; `? in [a, b]` — the same, searched in [a, b] (2026-11-08, B)."""
+    return bool(_QUESTION_RE.match((value or "").strip()))
+
+
+def question_region(value):
+    """The search region of `? in [a, b]` as two Fractions, or None (a bare `?`, or ends that are not numbers)."""
+    m = _QUESTION_RE.match((value or "").strip())
+    if not m or not m.group(1):
+        return None
+    from fractions import Fraction as _F
+    try:
+        lo, hi = (x.strip() for x in m.group(1)[1:-1].split(","))
+        lo, hi = _F(lo), _F(hi)
+    except (ValueError, ZeroDivisionError):
+        return None
+    return (lo, hi) if lo < hi else None
+
+
+_SCI = re.compile(r"(?<![A-Za-z_0-9.])(\d+(?:\.\d*)?|\.\d+)[eE]([-+]?\d+)")
+
+
+def _plain_numbers(text):
+    """`4.5e-05` -> `0.000045`, exactly (Decimal). The validator took scientific notation and the numeric floor's reader
+    did not: the pump of the blind test, typed with its 4.5e-05, died at the claim with E_UNREADABLE (the curator's
+    shakedown, 2026-11-08). A name never starts with a digit, and the look-behind keeps `x2e3` a name."""
+    from decimal import Decimal
+
+    def one(m):
+        d = Decimal(m.group(0))
+        t = format(d, "f")
+        return t.rstrip("0").rstrip(".") if "." in t else t
+    return _SCI.sub(one, text)
+
+
+def to_sheet(rows):
+    """The numeric floor's own line, assembled from the cells so that nobody
+    has to write it. `x=1500 earned:inv-17 RUB` was always a good language —
+    it was just never a language anyone should have to TYPE."""
+    parts = []
+    for r in numeric_rows(rows):
+        prov = (f"earned:{_witness(r)}"
+                if (r.get("status") == "verified" and r.get("ground"))
+                else "credit")
+        # whitespace inside a value is layout, not content: "[0, 1]" is how people and models write an interval, and the
+        # sheet reader takes "[0,1]" only (2026-11-05: a blind formalization died three rounds on "[0, 1]")
+        value = _plain_numbers(re.sub(r"\s+", "", r["value"]))   # outside the f-string: Python 3.11 (CI) forbids a backslash
+        if is_question(value):
+            value = "?"                                   # a search region is the system solver's, not the sheet's
+        bits = [f"{r['name']}={value}", prov]
+        if (r.get("scale") or "").strip():
+            bits.append(r["scale"].strip())
+        if (r.get("unit") or "").strip():
+            bits.append(r["unit"].strip())
+        if r.get("sample"):
+            bits.append("sample")
+        if r.get("convention"):
+            bits.append("convention")
+        parts.append(" ".join(bits))
+    return ", ".join(parts)
+
+
+def _row_mark(r):
+    """A row's value for the judge. A VERIFIED row that carries a DEGREE was checked for its degree, not for its truth
+    (2026-11-05, the curator: "да, делай Z"): it enters by the projection of that degree — [1,1] -> T, [0,0] -> F,
+    anything between -> Z, the input value ZTL already has. The connectives are untouched and still answer only T or
+    F; before this, 'a & b' at degrees 0.3 and 0.7 was EARNED while its probability is at most 3/10. A told degree
+    (an unverified row) stays Z whatever it says."""
+    m = _MARK.get(r.get("status"), "Z")
+    # A SEARCH THAT FOUND NOTHING is no proof of "none" (2026-11-06): the row enters as Z, as unchecked
+    if m == "T" and (r.get("ground_kind") or "").strip() == "search":
+        return "Z"
+    if m == "T" and (r.get("degree") or "").strip():
+        try:
+            lo, hi = parse_degree(r["degree"])
+        except ValueError:
+            return m                                                    # E_DEGREE refuses the document already
+        return "T" if lo == 1 else "F" if hi == 0 else "Z"
+    return m
+
+
+def to_marking(rows):
+    """Statuses as the propositional judge reads them. A `defined` row is
+    not a marking entry — it is a sentence, and belongs to the system."""
+    return {r["name"]: _row_mark(r) for r in rows
+            if r.get("status") in _MARK and not (r.get("value") or "").strip()}
+
+
+def to_system(rows):
+    """The self-referential part, if there is one. Names a definition leans
+    on that are NOT themselves defined enter as inputs carrying their own
+    status — an unverified input imported into the system, exactly as v1
+    did it, but without anyone having to declare a genre to get there."""
+    _cmp = compare_rows(rows)
+    defined = {r["name"]: r for r in rows if r.get("status") == "defined" and r["name"] not in _cmp}
+    if not defined:
+        return {}
+    system = {}
+    for name, r in defined.items():
+        system[name] = _formula_prop(r.get("ground") or "")
+    # ONCE, not per row (2026-09-26, the cloud red team, F5): asking names_in
+    # of every defined ground for every row was O(rows^2) — 800 defined and
+    # 800 plain rows, a 99 KB body under every cap, cost 16 s of CPU.
+    mentioned = set()
+    for d in defined.values():
+        mentioned |= names_in(d.get("ground") or "")
+    for r in rows:
+        if r["name"] in defined:
+            continue
+        if r["name"] in mentioned:
+            system[r["name"]] = _row_mark(r)
+    return system
+
+
+def to_book(rows):
+    """The ledger's view: one claim per row that has a value, grounded as the
+    row says. This is what makes blast radius and trust brackets reachable
+    from the same table."""
+    book = []
+    for r in numeric_rows(rows):
+        # a `?` is a QUESTION, not a claim about a value: there is nothing
+        # for the ledger to hold, and building `b == ?` crashed the sheet
+        # parser outright (found by running every catalogue example, which
+        # is the whole reason they are run rather than merely stored)
+        if is_question(r.get("value")):
+            continue
+        prov = (f"earned:{_witness(r)}"
+                if (r.get("status") == "verified" and r.get("ground"))
+                else "credit")
+        book.append((r["name"], f"{r['name']} == {r['value'].strip()}",
+                     f"{r['name']}={r['value'].strip()} {prov}"))
+    return book
+
+
+_COMPARES = re.compile(r"<=|>=|==|!=|<|(?<!-)>")
+
+import zdegree                                                   # noqa: E402 (ZTL degrees, 2026-11-05)
+
+
+def parse_degree(text):
+    """'0.3' | '3/10' | '[0.2, 0.4]' -> (lo, hi) Fractions inside [0, 1], or raise ValueError with the reason"""
+    from fractions import Fraction as _Fr
+    t = re.sub(r"\s+", "", str(text or ""))
+    m = re.fullmatch(r"\[([^,\[\]]+),([^,\[\]]+)\]", t)
+    try:
+        lo, hi = (_Fr(m.group(1)), _Fr(m.group(2))) if m else (_Fr(t), _Fr(t))
+    except (ValueError, ZeroDivisionError):
+        raise ValueError(f"'{text}' is not a degree: write 0.3, 3/10 or [0.2, 0.4]")
+    if not (0 <= lo <= hi <= 1):
+        raise ValueError(f"a degree lies in [0, 1] with its lower end first: got [{lo}, {hi}]")
+    return lo, hi
+
+
+def _fmt(x):
+    return str(x) if x.denominator != 1 else str(x.numerator)
+
+
+def degree_report(doc, rows, claim):
+    """ZTL degrees: the claim's degree — the least and greatest probability that it is true, over every joint of its
+    statements that keeps each one's own degree (zdegree.py: exact, each end proved by a witness and a dual).
+    Rows without a degree count as verified [1,1], refuted [0,0], unverified [0,1] (a dirty atom, read anew at each
+    occurrence); a comparison counts by the numeric floor's verdict. A degree on an UNVERIFIED row was told, not
+    checked: where the result rests on it, a threshold verdict is held at ON CREDIT."""
+    if not claim:
+        return None
+    by = {r["name"]: r for r in rows if r.get("name")}
+    selfref = {n for n, r in by.items() if r.get("status") == "defined"} - set(compare_rows(rows))
+    if names_in(claim) & selfref:
+        return {"refused": "the claim leans on a self-reference definition: degrees are not read across the "
+                           "passport office (the liar has no probability here)"}
+    degrees, core = {}, claim
+    if _COMPARES.search(claim):
+        try:
+            q, marks = parse_quantities(to_sheet(rows))
+            marks.update({n: m for n, m in to_marking(rows).items() if n not in q})
+            num = judge_sheet_claim(claim, q, marks)
+        except Exception as exc:
+            return {"refused": f"the comparisons could not be read for a degree ({type(exc).__name__})"}
+        core = num["core_formula"]
+        for nc, a in (num.get("numeric_atoms") or {}).items():
+            degrees[nc] = {"T": "T", "F": "F"}.get(a.get("verdict"), "Z")
+    told, notes = [], []
+    for name in sorted(names_in(core) - set(degrees)):
+        r = by.get(name)
+        if r is None:
+            continue
+        if (r.get("degree") or "").strip():
+            degrees[name] = parse_degree(r["degree"])
+            if r.get("status") == "unverified":
+                told.append(name)
+        else:
+            degrees[name] = {"verified": "T", "refuted": "F"}.get(r.get("status"), "Z")
+    try:
+        sep = zdegree.degree(core, degrees)
+        stab = zdegree.degree(core, degrees, stable=True)
+        groups = doc.get("independent") if isinstance(doc.get("independent"), list) else None
+        if groups:
+            ind = zdegree.degree_groups(core, degrees, groups)
+        else:
+            ind = zdegree.degree_independent(core, degrees) if doc.get("independent") else None
+    except zdegree.DegreeError as exc:
+        return {"refused": str(exc)}
+    use = ind or sep
+    out = {"interval": [_fmt(sep["lo"]), _fmt(sep["hi"])], "if_stable": [_fmt(stab["lo"]), _fmt(stab["hi"])],
+           "events": len(sep["events"]), "proved": "each end attained by a joint and bounded by a dual (zdegree)"}
+    if ind:
+        out["independent"] = [_fmt(ind["lo"]), _fmt(ind["hi"])]
+        out["stipulated"] = ("independence between the groups " + " | ".join(", ".join(g) for g in groups) +
+                             "; the joint inside each group unknown (a convention, not a finding)" if groups else
+                             "independence of the claim's statements (a convention, not a finding)")
+    # which told degrees does the answer rest on? widen each to [0, 1] and see whether the interval moves
+    bearing = []
+    for name in told:
+        wide = dict(degrees, **{name: (zdegree.ZERO, zdegree.ONE)})
+        try:
+            w = (zdegree.degree_groups(core, wide, groups) if groups else
+                 zdegree.degree_independent(core, wide) if ind else zdegree.degree(core, wide))
+        except zdegree.DegreeError:
+            continue
+        if (w["lo"], w["hi"]) != (use["lo"], use["hi"]):
+            bearing.append(name)
+    if bearing:
+        out["rests_on_told"] = bearing
+    need = (doc.get("need") or "").strip()
+    if need:
+        try:
+            n = parse_degree(need)[0]
+        except ValueError:
+            n = None
+        if n is not None:
+            verdict = "EARNED" if use["lo"] >= n else "REFUTED" if use["hi"] < n else "OPEN"
+            out["need"] = _fmt(n)
+            cures = []
+            if verdict == "OPEN":
+                cures = [f"narrow {nm}" for nm, d in sorted(degrees.items())
+                         if d == "Z" or (isinstance(d, tuple) and d[0] != d[1])] + \
+                        ([] if ind else ["stipulate independence (only if it is true)"]) + \
+                        [f"the joint inside the group {', '.join(g)} (still unknown)" for g in (groups or [])
+                         if len(g) > 1]
+            if verdict != "OPEN" and bearing:
+                out["polarity"] = "toward T" if verdict == "EARNED" else "toward F"
+                verdict = "ON CREDIT"
+                cures = [f"document {nm}" for nm in bearing]
+            out["verdict"] = verdict
+            out["next_check"] = cures
+    return out
+
+
+def applies(doc):
+    """Which instruments have something to say. The report shows these and
+    no more; nobody chooses a tab."""
+    rows = doc.get("rows") or []
+    return {
+        "numeric": bool(numeric_rows(rows)),
+        "passport": bool(to_system(rows)),
+        # THE LEDGER APPLIES WHENEVER THERE ARE GROUNDS AT ALL, not only
+        # when an exotic kind is chosen. The curator, looking at the form:
+        # "ground is unclear and answers for nothing — remove it and use
+        # `means` instead and nothing changes." Half right, and the half
+        # that was right was ours: the name carries IDENTITY, so two rows
+        # on one document fall together and the blast radius is computed
+        # from it — but none of that was on screen unless you happened to
+        # pick a certificate. A column whose work is invisible is a column
+        # that does nothing, whatever the code knows.
+        "ledger": bool(to_book(rows)) and any(
+            (r.get("ground") or "").strip() for r in numeric_rows(rows)),
+        # THE EPOCH FLOOR speaks whenever a row declares a clock. It needs a
+        # claim too: what it measures is whether the CONCLUSION survives the
+        # world changing, which is `EpochBoundary.epoch_boundary_iff` read
+        # over one document instead of over every formula at once.
+        # ...and it reads STATEMENTS: a claim that compares numbers is not read across the clock (2026-11-05: such a
+        # claim beside a clock crashed the floor — "stray character '>'" — on a document that had passed validation;
+        # an A/B of the translator found it). Not silent: validate says so (W_EPOCH_NUMERIC).
+        "epoch": bool((doc.get("claim") or "").strip()) and any(
+            (r.get("expires_on") or "").strip() for r in rows)
+            and not _COMPARES.search(normalise((doc.get("claim") or "").strip(), rows)),
+        "judge": bool((doc.get("claim") or "").strip()),
+        "degree": bool((doc.get("claim") or "").strip()) and (
+            any((r.get("degree") or "").strip() for r in rows) or bool((doc.get("need") or "").strip())
+            or bool(doc.get("independent"))),
+        # a bound over the whole box, checked by the kernel on a certificate (zflcert.py)
+        "bounds": bool(doc.get("bounds")) and bool(numeric_rows(rows)),
+    }
+
+
+def missing_facts(claim, sheet, unknowns, limit=4):
+    """How many more FACTS the question needs, found by trying.
+
+    "I have 2 more than Petya and 3 less than Vasya — how much do I have?"
+    has no answer: two relations, three unknowns. The solver says OPEN and
+    lists six cures, `measure me · measure petya · measure vasya · …`, which
+    is true and reads as though all of them were needed. One would do.
+
+    Rather than reason about the rank of a system, this MEASURES it the way
+    everything else here is measured: pin one unknown at a trial value,
+    re-solve, and see what follows. If the rest fall into place, the
+    question was one fact short, and the report can say so and name the
+    choices. That is a different sentence from "measure everything", and it
+    is the one the person asked for."""
+    if not unknowns:
+        return None
+    enough = []
+    for name in unknowns:
+        parts = []
+        for piece in sheet.split(", "):
+            n = piece.split("=", 1)[0].strip()
+            parts.append(f"{n}=7 credit" if n == name else piece)
+        try:
+            q2, m2 = parse_quantities(", ".join(parts))
+            r2 = solve_claim(claim, q2, m2)
+        except Exception:
+            continue
+        pinned = {k for k, v in (r2.get("solved") or {}).items()
+                  if v.get("pinned")}
+        if len(pinned | {name}) >= len(unknowns):
+            enough.append(name)
+        if len(enough) >= limit:
+            break
+    if enough:
+        return {"needs": 1, "any_of": enough}
+    return {"needs": None, "any_of": []}
+
+
+# ЯРУСЫ, КОТОРЫЕ НИКТО НЕ МОЖЕТ ПРОВЕРИТЬ ДЕЙСТВИЕМ ИЛИ ОТКРЫВ ДОКУМЕНТ.
+# Основание яруса `act` можно ЗАПУСТИТЬ, яруса `place` — ОТКРЫТЬ. А `story`
+# держится на том, что так СКАЗАНО внутри разобранного случая. Это третий рог
+# Агриппы, и наша же книга (гл. 13) говорит, что делать: «стена перестаёт быть
+# позором, когда на ней висит табличка», судья метит такое основание как
+# решаемое ВЫБОРОМ, а всё, что на нём стоит, получает бирку с именем виновника.
+# До 2026-08-28 бирки не было: строка на назначенном зарабатывала МОЛЧА,
+# наравне с той, под которой лежит прогон.
+СТИПУЛЯЦИЯ = {"story"}
+
+
+def on_stipulation(rows, registry):
+    """Имена, заработавшие на ОБЪЯВЛЕННОМ, а не на предъявимом.
+
+    Работает, только если реестр пришёл С ЯРУСАМИ (словарём). Плоское
+    множество ярусов не несёт — тогда молчим, а не догадываемся: назвать
+    стипуляцией то, про что нам не сказали, было бы ровно тем сортом
+    домысла, против которого весь прибор."""
+    if not isinstance(registry, dict):
+        return []
+    вина = []
+    for r in rows:
+        if r.get("status") not in ("verified", "refuted"):
+            continue
+        ярус = registry.get((r.get("ground") or "").strip())
+        if ярус in СТИПУЛЯЦИЯ:
+            вина.append({"name": r["name"], "ground": r.get("ground"),
+                         "tier": ярус})
+    return вина
+
+
+def demote_unregistered(rows, registry):
+    """Ворота оснований — слово куратора 2026-08-27 («почини»).
+
+    Дыра, промеренная в тот же день: у `verified` основание проверяется на
+    ФОРМУ (непустое, без пробелов) и никогда — на существование; строка с
+    основанием `ОСНОВАНИЕ-КОТОРОГО-НЕТ` зарабатывала `T EARNED hereditary`.
+    В книге `по-построению` стояло основанием заработанного 8 раз.
+
+    Лекарство НЕ сертификат и НЕ внешний потребитель (куратор насторожился — и прав):
+    просто необязательный СПИСОК допустимых оснований. Дал список — слово не
+    из списка НЕ зарабатывает: строка судится как `unverified`, то есть
+    падает в кредит, а не в ложь. Не дал — поведение прежнее, байт в байт.
+    Fail-closed в духе ядра: непредъявленное основание не покупает вердикт."""
+    out, demoted = [], []
+    for r in rows:
+        g = (r.get("ground") or "").strip()
+        if r.get("status") in ("verified", "refuted") and g not in registry:
+            r2 = dict(r)
+            r2["status"], r2["ground"] = "unverified", ""
+            out.append(r2)
+            demoted.append(r["name"])
+        else:
+            out.append(r)
+    return out, demoted
+
+
+def _root_text(lo, hi):
+    """A root as a person reads it: exact when it is (`-2`, `1/3`), else the
+    square root's clamp shown as ≈ and twelve significant digits."""
+    if lo == hi:
+        return str(lo)
+    return "≈" + format(float((lo + hi) / 2), ".12g")
+
+
+def resolved_marking(rows):
+    """The marking the judge should have seen all along.
+
+    `to_marking` reports the marks and stops, because a `defined` row is a
+    sentence rather than a mark. True — and it leaves the judge blind to
+    every value the sentences DETERMINE: a claim over defined names came
+    back `Z` however well grounded its parts were. The passport already
+    computes those values (the least fixed point of the stable step), so here
+    they are simply added on top of the marks. The marks win where both
+    speak: a row that was checked is not overruled by a computation."""
+    m = dict(to_marking(rows))
+    system = to_system(rows)
+    if system:
+        lfp, _, _ = zpassport.passports(system)
+        for name, v in lfp.items():
+            # a sentence the fixed point never determined (phase N) hardens into the quarantine MARK Z when it
+            # is handed to the judge (SPEC §N; pure branch 2026-11-22: N is never a mark of the judge's input)
+            m.setdefault(name, "Z" if v == N else v)
+    return m
+
+
+def unredeemable(comp_kind):
+    """Names whose mark no act can ever lift.
+
+    THE SEAM THIS CLOSES (2026-08-28, found by marking up Protagoras v.
+    Euathlus). The judge and the passport read the same document and never
+    exchanged a word: `to_marking` drops `defined` rows on purpose — a
+    sentence is not a mark — so the judge saw an unmarked atom, said
+    `until-verification` and sent the reader off to check the liar, while
+    the passport in the SAME report said the refusal was permanent.
+
+    The grade was not miscomputed; it was computed over a marking that
+    could not say what the sentences forbid. `ZTime.Completable` names the
+    missing notion and `ZTime.flip_only_where_forbidden` proves the shape
+    of the lie: the flip `until` promises can only happen at an ending the
+    system itself rules out. Here that theorem's hypothesis is read off
+    the passport, which has always known it — a PARADOX component, and
+    whatever hangs off one."""
+    out = set()
+    for name, (kind, param) in comp_kind.items():
+        if kind == "PARADOX" or (kind == "DOWNSTREAM" and param == "permanent"):
+            out.add(name)
+    return out
+
+
+# THE REVERSE PASS, after the verdict: which unverified inputs to check, and
+# how. `zbackward` (moved from inventory/ on 2026-09-24) gives the minimal
+# sets by GUARANTEE — check them together and the target comes whatever they
+# turn out to be; a work order is written only from these — and by
+# POSSIBILITY — the target becomes reachable if the check goes the right way.
+# THE CAP IS FOR A PUBLIC SERVICE, MEASURED 2026-09-24 on this machine, both
+# targets together: 6 unverified inputs 0.12 s, 7 1.0 s, 8 1.5 s, 9 5.4 s.
+# zbackward's own ceiling of 9 is a notebook's; each request here pays its own.
+# 2026-09-27 (PR #4): those were SHORT claims. The count of whole judges is
+# 3 x sum_k C(u,k) 2^k (1,416 at u = 6) and each grows with the claim: u = 6 cost
+# 0.8 s at 100 characters and 23 s at 4000; u = 4, 0.65 s at 1000. With the three
+# targets now sharing one memo, u = 3 stays under 0.3 s at 2000 characters. 6 -> 3.
+BACKWARD_CAP = 3
+
+
+def what_to_check(claim, marking, unverified, hold=()):
+    """Minimal sets of the claim's own unverified inputs: for EARNED, for REFUTED,
+    and to SETTLE the matter either way. `hold` (2026-11-05): inputs no check can settle — chance rows, Z by a
+    degree. They stay Z in the marking, and every set that would check one of them is dropped; a minimal set free of
+    them stays minimal (each of its subsets is free of them too), so nothing a real check could do is lost."""
+    phi = formalize(claim)
+    atoms = _formula_atoms(phi)
+    own = sorted(a for a in unverified if a in atoms)
+    # READ-ONCE: NO CAP (ZTL 610984c, zbackward_tree). Where every unverified input
+    # occurs once in the claim, the reverse pass is read off the connectives' tables in
+    # one walk — no judge per filling, no size cut: "a & b & c & d & e & f & g" gets its
+    # one set of seven instead of a refusal. Where an input repeats, the enumeration and
+    # its cap stand.
+    # REPEATED INPUTS TOO (ZTL 6df2b38): the repeated ones are enumerated as worlds, the
+    # rest still read off the tables — the cap stands only past REPEAT_CAP repeated inputs.
+    occ = _occurrences(phi, {})
+    repeated = [a for a in own if occ.get(a, 0) > 1]
+    read_once = len(repeated) <= zbackward_tree.REPEAT_CAP
+    if len(own) > BACKWARD_CAP and not read_once:
+        return {"refused": f"{len(own)} unverified inputs, {len(repeated)} of them used more than "
+                           f"once; the reverse pass is then computed up to {BACKWARD_CAP} (it calls the "
+                           f"whole judge up to 3·Σ C(u,k)·2^k times)"}
+    m = {a: v for a, v in marking.items() if a in atoms}
+    out, memo = {}, {}          # the three targets share one disposition per filling
+    # SETTLED is the order a person can act on first: check these, and the
+    # verdict becomes final (EARNED or REFUTED) whatever they turn out to be.
+    for target, key in (("EARNED", "EARNED"), ("REFUTED", "REFUTED"),
+                        (zbackward.TERMINAL, "SETTLED")):
+        b = zbackward.backward(phi, m, target, by_disposition=True,
+                               cap_grounds=BACKWARD_CAP if not read_once else len(own), memo=memo)
+        # AN EMPTY FAMILY IS SAID, NOT LEFT EMPTY: a bare [] reads as
+        # "nothing to check", the opposite of "no set will do" (zbackward's
+        # own rule, kept at the door).
+        out[key] = {"already": b["already"],
+                       "guaranteed": [list(x) for x in b["guaranteed"]],
+                       "possible": [list(x) for x in b["possible"]],
+                       "no_guaranteed_set": bool(b["guaranteed_none"]) and not b["already"],
+                       "no_possible_set": bool(b["possible_none"]) and not b["already"]}
+        if "не_искал_дальше" in b:
+            out[key]["searched_up_to"] = zbackward.MAX_K
+        if hold:
+            o = out[key]
+            for fam, flag in (("guaranteed", "no_guaranteed_set"), ("possible", "no_possible_set")):
+                kept = [x for x in o[fam] if not set(x) & set(hold)]
+                if o[fam] and not kept:
+                    o[flag] = True
+                o[fam] = kept
+    return out
+
+
+def _occurrences(phi, acc):
+    if isinstance(phi, str):
+        acc[phi] = acc.get(phi, 0) + 1
+        return acc
+    for x in phi[1:]:
+        _occurrences(x, acc)
+    return acc
+
+
+def _formula_atoms(phi):
+    if isinstance(phi, str):
+        return {phi}
+    return set().union(*(_formula_atoms(x) for x in phi[1:])) if phi else set()
+
+
+
+def _system_equations(text):
+    """A claim made only of equations joined by `&` (top level): [(lhs, rhs), ...] or None."""
+    parts, depth, start = [], 0, 0
+    for i, c in enumerate(text):
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif c == "&" and depth == 0:
+            parts.append(text[start:i]); start = i + 1
+    parts.append(text[start:])
+    eqs = []
+    for part in parts:
+        depth, at, width = 0, None, 0
+        for i, c in enumerate(part):
+            if c in "([":
+                depth += 1
+            elif c in ")]":
+                depth -= 1
+            elif c == "=" and depth == 0:
+                prev = part[i - 1] if i > 0 else ""
+                nxt = part[i + 1] if i + 1 < len(part) else ""
+                if prev in "<>!=":
+                    continue
+                if at is not None:
+                    return None                    # two equalities in one part
+                at, width = i, (2 if nxt == "=" else 1)
+                if nxt == "=":
+                    continue
+        if at is None:
+            return None
+        lhs, rhs = part[:at].strip(), part[at + width:].strip()
+        if not lhs or not rhs or any(op in part for op in ("<", ">", "|", "->", "~")):
+            return None
+        eqs.append((lhs, rhs))
+    return eqs
+
+
+def _implicit_answer(claim, q, x, region):
+    """ONE unknown with its region and REAL PARAMETERS, where the solver and the system path proved nothing (the
+    curator's shakedown, 2026-11-08: the pump of the blind test was OPEN in ZFL while the kernel's implicit judge
+    answers it). zimplicit searches a certificate and the kernel checks it (zimplicit.check_implicit): every solution
+    in the region, for every parameter in the box, lies in [lo, hi]; with "unique", at most one per parameter.
+    EXISTENCE for every parameter is read here: the excluded pieces on both sides of the kept run have readings of
+    strictly opposite signs over the whole box, so each parameter's law changes sign across [lo, hi] (the
+    intermediate values; the Lean bridge proves the same, tools/zimplicit_lean.py). No tightening on the service:
+    MEASURED, the oil cooler's tightening took 30 s (its plain hull is the whole region — OPEN, said)."""
+    eqs = _system_equations(claim)
+    if eqs is None or len(eqs) != 1:
+        return None
+    try:
+        from znumjudge import _parse_arith as _pa
+        import zimplicit as _ZI
+        import zcertify as _ZC
+        g = _pa(f"({eqs[0][0]}) - ({eqs[0][1]})", q)
+        if x not in _ZC._names(g):
+            return None
+        params = sorted(n for n in _ZC._names(g) if n in q and n != x and q[n]["lo"] < q[n]["hi"])
+        if not params:
+            return None    # no parameters: the region search answers completely — and BEFORE the search (MEASURED
+            #               2026-11-08: cos x = 0.99 spent 2.3 s of 4.5 in a search whose answer was thrown away)
+        a, b = region
+        cert = _ZI.search_certificate(g, x, q, [a, b])
+        if cert is None:
+            return None
+        res = _ZI.check_implicit(g, x, q, cert)
+        if not res[0] or res[1] is None:
+            return None
+        from fractions import Fraction as _F
+        lo, hi = _F(res[1][0]), _F(res[1][1])
+        box = {n: (q[n]["lo"], q[n]["hi"]) for n in params}
+        pieces = [(_F(str(pc["lo"])), _F(str(pc["hi"])), pc["kind"]) for pc in cert["pieces"]]
+        kept = [i for i, pc in enumerate(pieces) if pc[2] == "kept"]
+        exists = False
+        if kept and kept[0] > 0 and kept[-1] + 1 < len(pieces):
+            def rd(pc):
+                piece = dict(box)
+                piece[x] = (pc[0], pc[1])
+                return _ZC._reading(g, q, piece)
+            L, R = rd(pieces[kept[0] - 1]), rd(pieces[kept[-1] + 1])
+            exists = (L[0] > 0 and R[1] < 0) or (L[1] < 0 and R[0] > 0)
+    except Exception:
+        return None
+    unique = bool(cert.get("unique"))
+    weak = [n for n in params if q[n].get("prov") != "earned"]
+    if unique and exists:
+        disp = "EARNED" if not weak else "ON CREDIT"
+        how = (f"for every parameter value in the box, exactly one solution in the search region, within [{lo}, {hi}] "
+               f"(the implicit judge: every reading checked exactly; the existence by the law's opposite signs read "
+               f"on both sides)")
+        roots = [f"[{lo}, {hi}]"]
+    elif lo > a or hi < b:
+        disp = "OPEN"
+        how = (f"every solution in the search region, for every parameter value in the box, lies in [{lo}, {hi}] "
+               f"(the implicit judge, checked exactly); that one exists for each "
+               f"{'and that it is the only one ' if not unique else ''}is not shown")
+        roots = []
+    else:
+        return None
+    solved = {x: {"lo": str(lo), "hi": str(hi), "pinned": False, "prov": "earned" if not weak else "credit",
+                  "from": params, "weak": weak, **({"roots": roots} if roots else {}), "implicit": True}}
+    return {"solved": solved, "disposition": disp, "how": how, "unique": unique, "exists": exists}
+
+
+def _system_answer(claim, q, unknowns, regions=None, budget=6000, search_budget=None, seconds=20):
+    """A SYSTEM (2026-11-08, the curator's "Синтаксис систем в ZFL — принято. Делай."): several unknowns `x = ?` and
+    a claim of as many equations. zsystem finds certificates and checks them exactly (Krawczyk, the contraction form,
+    the kernel's readings).
+      B — every unknown carries a search region (`x = ? in [0, 2]`): the region is exhausted (each box excluded by a
+          reading or inside a certified solution's cube) and the answer is COMPLETE: all the solutions in the region,
+          each unique in its cube (none: the claim is refuted there);
+      A — otherwise (or when the region is not exhausted within the budget): one solution in a cube, the only one
+          there; solutions elsewhere NOT excluded (W_SYSTEM_LOCAL).
+    None when the claim is not such a system or nothing is proved — then the answer stays the solver's."""
+    eqs = _system_equations(claim)
+    one = len(unknowns) == 1                      # ONE unknown: only with its region (the curator's order, 08.11 17:28)
+    if eqs is None or len(eqs) != len(unknowns) or not unknowns or \
+            (one and not (regions and regions.get(unknowns[0]))):
+        return None
+    try:
+        from znumjudge import _parse_arith as _pa
+        laws = [_pa(f"({lhs}) - ({rhs})", q) for lhs, rhs in eqs]
+        import zsystem as _ZS
+        import zcertify as _ZC
+        used = set().union(*[_ZC._names(g) for g in laws])
+        if not set(unknowns) <= used:
+            return None
+    except Exception:
+        return None
+    from fractions import Fraction as _F
+    params = sorted(n for n in used if n in q and n not in unknowns)
+    weak = [n for n in params if q[n].get("prov") != "earned"]
+    prov = "earned" if not weak else "credit"
+
+    def answer(sols, complete, how):
+        solved = {}
+        for i, n in enumerate(unknowns):
+            boxes = []
+            for cert, _h in sols:
+                c, rad = _F(cert["centre"][i]), _F(cert["radius"])
+                boxes.append((c - rad, c + rad))
+            if boxes:
+                solved[n] = {"lo": str(min(b[0] for b in boxes)), "hi": str(max(b[1] for b in boxes)),
+                             "pinned": False, "prov": prov, "from": params, "weak": weak,
+                             "roots": [f"[{lo}, {hi}]" for lo, hi in boxes], "system": True, "complete": complete}
+        disp = ("REFUTED" if complete and not sols else "EARNED" if prov == "earned" else "ON CREDIT")
+        return {"solved": solved, "disposition": disp, "complete": complete, "count": len(sols),
+                "certs": [c for c, _h in sols], "how": how}
+
+    region_ok = bool(regions) and all(regions.get(n) for n in unknowns)
+    found = []
+    if region_ok:
+        try:
+            res = _ZS.solve_all(laws, list(unknowns), q, {n: regions[n] for n in unknowns}, budget=budget,
+                                search_budget=search_budget, seconds=seconds)   # 20 s: a public service (08.11)
+        except Exception:
+            res = None
+        if res is not None and res["complete"]:
+            k = len(res["solutions"])
+            return answer(res["solutions"], True,
+                          f"all the solutions in the search region: {k}" + (", each the only one in its cube"
+                                                                          if k else " (the claim is refuted there)"))
+        found = res["solutions"] if res else []
+    if found:
+        return answer(found, False, "the search region was not exhausted within the budget")
+    try:
+        res = _ZS.search(laws, list(unknowns), q)
+    except Exception:
+        return None
+    if res is None:
+        return None
+    cert, (_ok, how) = res
+    return answer([(cert, how)], False, how)
+
+
+def run(doc, ground_registry=None):
+    """Validate, then ask whichever instruments apply.
+
+    THE INVARIANT, learned the hard way over an evening of one-at-a-time
+    fixes: a document that PASSES validation may not make this function
+    raise. The core's parsers throw on syntax they do not know, and every
+    such throw arrived at the user as "internal studio error — the detail is
+    in the server log", which tells them nothing and tells us only after
+    they complain. Anything the instruments refuse becomes an issue
+    addressed to the claim, in the same shape as every other issue. The
+    underlying gap still gets fixed; it just stops being invisible while it
+    waits."""
+    doc = coerce(doc)
+    issues = validate(doc)
+    if any(i["level"] == "error" for i in issues):
+        return {"ok": False, "issues": issues}
+    rows = doc["rows"]
+    demoted = []
+    # Документ вправе объявить свой реестр сам; параметр вызова остаётся и
+    # ПЕРЕВЕШИВАЕТ — на случай, когда допустимое решает не автор документа,
+    # а тот, кто его принимает.
+    if ground_registry is None:
+        declared = (doc.get("grounds") or "").strip()
+        if declared:
+            # ЯРУС МОЖНО ОБЪЯВИТЬ ПРЯМО ЗДЕСЬ: «master:story, perebor:act».
+            # Без этого бирка «стоит на объявленном» была бы достижима только
+            # из питона — пятый за день случай «построено и не позвано», и
+            # закрыт он в тот же час, что замечен. Ярус не указан — значит
+            # НЕ УКАЗАН, и прибор про такое основание молчит, а не гадает.
+            пары = [g.strip() for g in declared.split(",") if g.strip()]
+            if any(":" in g for g in пары):
+                ground_registry = {}
+                for g in пары:
+                    имя, _, ярус = g.partition(":")
+                    ground_registry[имя.strip()] = (ярус.strip() or None)
+            else:
+                ground_registry = {g for g in пары}
+    if ground_registry is not None:
+        rows, demoted = demote_unregistered(rows, set(ground_registry))
+    claim = normalise((doc.get("claim") or "").strip(), rows)
+    what, report = applies(doc), {}
+    dead = set()
+
+    if what["passport"]:
+        system = to_system(rows)
+        lfp, reports, comp_kind = zpassport.passports(system)
+        dead = unredeemable(comp_kind)
+        report["passport"] = [
+            {"component": comp, "kind": kind, "detail": why}
+            for comp, kind, why in reports]
+        # EVERY ROW THE PASSPORT READ, not only the troubled ones. `reports`
+        # names problem components alone, so a table the passport grounded
+        # whole came back as `passport: []` — true, and it hid the answer the
+        # passport had computed: truncated Yablo is s2 = T, s1 = F, s0 = F,
+        # all GROUNDED (MEASURED 2026-09-24; the page said "nothing to judge").
+        # What each ground holds, and how it came out.
+        by_name = {x["name"]: x for x in rows}
+        report["passport_rows"] = {
+            # outward, a never-resolved phase N is shown as the quarantine mark it hardens into (SPEC §N)
+            name: {"kind": kind, "value": ("Z" if lfp.get(name) == N else lfp.get(name)),
+                   "reads": (sorted(names_in(by_name[name].get("ground")) & set(by_name))
+                             if by_name.get(name, {}).get("status") == "defined" else [])}
+            for name, (kind, _n) in sorted(comp_kind.items())}
+
+    if what["numeric"] and claim:
+        try:
+            sheet = to_sheet(rows)
+            q, m = parse_quantities(sheet)
+            m.update(to_marking(rows))
+            # An UNKNOWN in the table is a question, not a gap: `x=?` with
+            # `x - 10 = 20` asks the solver for x, and the solver answers
+            # with the provenance the answer inherited from the derivation.
+            # Judging alone would have said "measure x", which is true and
+            # useless when the sheet already determines it.
+            unknown = any(is_question(r.get("value"))
+                          for r in numeric_rows(rows))
+            if unknown:
+                r = solve_claim(claim, q, m)
+                solved = {n: {"lo": str(v["lo"]), "hi": str(v["hi"]),
+                              "pinned": v["pinned"], "prov": v["prov"],
+                              "from": v.get("from", []),
+                              "weak": v.get("weak", []),
+                              **({"roots": [ex or _root_text(lo, hi)
+                                            for (lo, hi), ex in zip(
+                                                v["roots"],
+                                                v.get("roots_exact")
+                                                or [None] * len(v["roots"]))]}
+                                 if v.get("roots") else {})}
+                          for n, v in (r.get("solved") or {}).items()}
+            else:
+                r = judge_sheet_claim(claim, q, m)
+                solved = {}
+            system = None
+            implicit = None
+            searched = False                      # the system's region was searched (and not exhausted)
+            if unknown:
+                unk = [x["name"] for x in numeric_rows(rows) if is_question(x.get("value"))]
+                regions = {x["name"]: question_region(x.get("value")) for x in numeric_rows(rows)
+                           if is_question(x.get("value"))}
+                # only where the exact solver gave NO answer: its pinned values and its paired roots
+                # (`area == s*s & area - 5*s + 6 == 0` -> s in {2, 3}) are complete and stay
+                # (test_quadratic caught the first version overwriting them, 2026-11-08)
+                # ONE unknown with its region (08.11): only where the solver PROVED nothing (OPEN; its `≈` roots
+                # are approximations, replaced by certified intervals); an exact answer (x*x = 2 -> ±√2) stays
+                # ONE unknown: the implicit judge FIRST (MEASURED 2026-11-08: the pump took 16 s with the region
+                # search tried before it, 7 s without); the region search only when it gives no full answer
+                # ... or where the solver's answer is an INTERVAL (x = a, a in a box) reaching out of the region (the
+                # shakedown, 2026-11-08: x = a, a in [-0.5, 0.5], x = ? in [0, 1] answered x in [-1/2, 1/2])
+                _sv = solved.get(unk[0]) if len(unk) == 1 else None
+                _out = False
+                if _sv and not _sv.get("pinned") and not _sv.get("roots") and regions.get(unk[0]):
+                    try:
+                        from fractions import Fraction as _Fr
+                        _out = _Fr(_sv["lo"]) < regions[unk[0]][0] or _Fr(_sv["hi"]) > regions[unk[0]][1]
+                    except (ValueError, ZeroDivisionError, TypeError):
+                        _out = False
+                one = len(unk) == 1 and regions.get(unk[0]) and (r["disposition"] == "OPEN" or _out)
+                if one:
+                    implicit = _implicit_answer(claim, q, unk[0], regions[unk[0]])
+                if one and implicit is not None and implicit["disposition"] != "OPEN":
+                    solved.update(implicit["solved"])
+                    r = dict(r, disposition=implicit["disposition"])
+                elif (len(unk) >= 2 and not any(solved.get(n, {}).get("pinned") or solved.get(n, {}).get("roots")
+                                                for n in unk)) or one:
+                    # one unknown beside parameter INTERVALS: a root that moves with the parameters is rarely caught
+                    # in one cube; a small budget (MEASURED 2026-11-08: the oil cooler spent 18 s to end OPEN)
+                    par = one and any(n != unk[0] and q[n]["lo"] < q[n]["hi"] for n in q)
+                    system = _system_answer(claim, q, unk, regions, budget=800 if par else 6000,
+                                            search_budget=8 if par else None)
+                    searched = all(regions.get(n) for n in unk)
+                    if system is not None:
+                        solved.update(system["solved"])
+                        r = dict(r, disposition=system["disposition"])
+            if implicit is not None and implicit["disposition"] == "OPEN":
+                if system is None:                         # the region search found nothing: the enclosure is said
+                    solved.update(implicit["solved"])
+                    r = dict(r, disposition="OPEN")         # the solver's interval reached out of the region: not T
+                else:
+                    implicit = None                        # the region search answered; the enclosure is not needed
+            # ONE unknown with its region and an EXACT answer over all the reals (the curator's shakedown,
+            # 2026-11-08: `x*x = 2` with `x = ? in [5, 6]` answered ±√2, outside the region): only the roots in the
+            # region are kept; none — refuted there
+            filtered = None
+            if unknown and len(unk) == 1 and system is None and regions.get(unk[0]) and \
+                    r["disposition"] in ("EARNED", "ON CREDIT"):
+                n0 = unk[0]
+                v0 = (r.get("solved") or {}).get(n0) or {}
+                ra, rb = regions[n0]
+                if v0.get("roots") and n0 in solved:
+                    idx = [i for i, (lo, hi) in enumerate(v0["roots"]) if lo <= rb and ra <= hi]
+                    filtered = (len(idx), len(v0["roots"]))
+                    solved[n0]["roots"] = [solved[n0]["roots"][i] for i in idx]
+                    if idx:
+                        solved[n0]["lo"] = str(min(v0["roots"][i][0] for i in idx))
+                        solved[n0]["hi"] = str(max(v0["roots"][i][1] for i in idx))
+                elif v0.get("pinned") and n0 in solved:
+                    inside = ra <= v0["lo"] and v0["hi"] <= rb
+                    filtered = (1 if inside else 0, 1)
+                if filtered is not None and filtered[0] == 0:
+                    r = dict(r, disposition="REFUTED")
+            report["numeric"] = {"disposition": r["disposition"],
+                                 "forced": r.get("forced"),
+                                 "next_check": r.get("next_check", []),
+                                 "solved": solved, "claim": claim,
+                                 "sheet": sheet,
+                                 # THE SOLVER'S OWN WORDS (2026-10-09). Whether a
+                                 # range is exact, exact over the linear rows only,
+                                 # or why a system was not solved lived in the
+                                 # solver's log and never reached the reader; the
+                                 # page promised "the log names the condition".
+                                 "log": list(r.get("log") or [])}
+            # THE ANSWER TRAVELS WITH ITS DISPOSITION. The numeric floor has
+            # always known the two-valued answer (the core's verdict under
+            # it) and, on credit, the side it leans to; this report kept
+            # neither, so the receipt of a number claim carried value,
+            # disposition and grade all null (MEASURED 2026-09-24 on every
+            # numeric example), and ON CREDIT could not say toward T or F.
+            core = r.get("core") or {}
+            report["numeric"]["verdict"] = core.get("verdict")
+            report["numeric"]["grade"] = (
+                "hereditary" if r["disposition"] in ("EARNED", "REFUTED") else
+                "until-verification" if r["disposition"] in ("OPEN", "ON CREDIT") else None)
+            report["numeric"]["unverified"] = list(core.get("unverified") or [])
+            # nc<i> IS A COMPARISON, SAY WHICH (29.09, blind cloud test: `nc1`
+            # reached a reader with nothing to say what it was).
+            try:
+                _nc = extract_comparisons(claim, {}, parse=False)[1]
+                if _nc:
+                    report["numeric"]["comparisons"] = {k: v[3].strip() for k, v in _nc.items()}
+            except Exception:
+                pass
+            if filtered is not None and filtered[0] == 0:
+                report["numeric"]["verdict"] = "F"          # the exact answer has no value in the region
+            if implicit is not None:
+                report["numeric"]["implicit"] = {"unique": implicit["unique"], "exists": implicit["exists"],
+                                                 "how": implicit["how"]}
+                if implicit["disposition"] == "OPEN":
+                    report["numeric"]["verdict"] = "Z"      # an enclosure, nothing established
+                    report["numeric"]["grade"] = "until-verification"
+                if implicit["disposition"] in ("EARNED", "ON CREDIT"):
+                    report["numeric"]["verdict"] = "T"
+                    report["numeric"]["grade"] = ("hereditary" if implicit["disposition"] == "EARNED"
+                                                  else "until-verification")
+                issues.append(_issue("warning", "W_IMPLICIT", unk[0], implicit["how"]))
+            if system is not None:
+                report["numeric"]["verdict"] = "F" if system["disposition"] == "REFUTED" else "T"
+                report["numeric"]["grade"] = ("hereditary" if system["disposition"] in ("EARNED", "REFUTED")
+                                              else "until-verification")
+                report["numeric"]["system"] = {"complete": system["complete"], "solutions": system["count"],
+                                               "certificates": system["certs"], "how": system["how"]}
+                where = ", ".join(sorted(system["solved"])) or "claim"
+                if system["complete"]:
+                    issues.append(_issue(
+                        "warning", "W_SYSTEM_ALL", where,
+                        f"the {'system' if len(unk) > 1 else 'equation'} was solved in the whole search region: "
+                        f"{system['how']} (Krawczyk's test and "
+                        f"the readings' exclusion of the rest, checked exactly); a cube may reach out of the region"))
+                else:
+                    issues.append(_issue(
+                        "warning", "W_SYSTEM_LOCAL", where,
+                        f"the {'system' if len(unk) > 1 else 'equation'} has a solution in the cube given for each "
+                        "unknown, and it is the only one there "
+                        "(Krawczyk's test, checked exactly); solutions OUTSIDE the cube are not excluded"
+                        + ("" if system["how"].startswith("a solution") else f" ({system['how']})")
+                        + ". Give each unknown a search region (x = ? in [a, b]) for the complete answer."))
+            if searched and system is None and implicit is None:
+                issues.append(_issue(
+                    "warning", "W_REGION_UNUSED", "value",
+                    "the search region was searched but not exhausted within the budget, and no solution was "
+                    "certified in it: where two curves only touch, the Jacobian is singular, or the solutions are not "
+                    "isolated (a whole curve of them), no cube can be certified and no box excluded; nothing is claimed"))
+            elif filtered is not None:
+                issues.append(_issue(
+                    "warning", "W_REGION_FILTERED", "value",
+                    f"the exact answer holds over all the reals; of its {filtered[1]} value(s), {filtered[0]} lie in "
+                    f"the search region and are kept" + ("" if filtered[0] else " — none: the claim is refuted there")))
+            elif unknown and not searched and implicit is None and \
+                    any(question_region(x.get("value")) for x in numeric_rows(rows)) and \
+                    not (system is not None and system["complete"]):
+                issues.append(_issue(
+                    "warning", "W_REGION_UNUSED", "value",
+                    "a search region `? in [a, b]` is read where the exact solver proved nothing, for as many "
+                    "equations as `?` values, every unknown with its region; here it was not used (the exact answer "
+                    "holds over all the reals, or the claim is not such equations)"))
+            # REFUTED WITH NO LETTER (29.09): a `?` no value can satisfy came
+            # back disposition REFUTED, verdict null. Refuted is F.
+            if report["numeric"]["verdict"] is None and r["disposition"] == "REFUTED":
+                report["numeric"]["verdict"] = "F"
+            # THE QUESTION WAS "WHICH VALUES?" (29.09, curator chose: warn, keep
+            # the meaning; SOLVABLE was tried and withdrawn — `?` IS a question,
+            # sec4 of test_zfl, and its answer is rightly EARNED). The trap is a
+            # yes/no question about an unknown INPUT written as `?`: the answer
+            # then says which values would do, not whether the real one does.
+            # Only a BOX, not roots: an equation that pins x (x*x - 5*x + 6 == 0
+            # gives 2 and 3) answered "find x" exactly; a box (-inf..2000) only
+            # says some value would do, which is the trap (MEASURED: the
+            # catalogue's quadratic went RED on the first version).
+            if unknown and solved and r["disposition"] == "EARNED":
+                for _n, _v in solved.items():
+                    if _v.get("pinned") or _v.get("roots"):
+                        continue
+                    issues.append(_issue(
+                        "warning", "W_SOLVED", _n,
+                        f"'{_n}' was read as the QUESTION and solved: the established answer is "
+                        f"{_n} in [{_v['lo']}, {_v['hi']}] — which values satisfy the claim, not "
+                        f"whether the actual {_n} does. If you asked whether the claim holds for a "
+                        f"real {_n} you do not know yet, give its range instead, e.g. [0,inf]."))
+            if r.get("polarity"):
+                report["numeric"]["polarity"] = r["polarity"]
+            # a REFUTED question needs no more facts: nothing makes it true
+            # (it said "needs 1 fact: x" beside REFUTED until 2026-09-24)
+            if unknown and not solved and r["disposition"] != "REFUTED":
+                names = [x["name"] for x in numeric_rows(rows)
+                         if is_question(x.get("value"))]
+                report["numeric"]["missing"] = missing_facts(claim, sheet,
+                                                             names)
+        except Exception as exc:
+            issues.append(_issue("error", "E_UNREADABLE", "claim",
+                                 f"the instruments could not read this "
+                                 f"claim: {exc}"))
+            return {"ok": False, "issues": issues}
+    elif what["judge"]:
+        try:
+            # THROUGH the definitions, not around them. `to_marking` reports
+            # marks and stops — correct about what a mark IS, and blind to
+            # every value the sentences DETERMINE. Measured on the book
+            # (2026-08-28): chapter 3 claims `honest_unknown & ~evasion`,
+            # both defined from rows that are verified, and the judge called
+            # it F/until-verification — a FALSE NEGATIVE it had been
+            # reporting all along. Two chapters of eighteen move, both from
+            # not-earned to earned. This is the architecture the draft
+            # already states: quarantine is the Z-set of the stable step's
+            # least fixed point, and ZTL is the greedy reading ON TOP of it.
+            r = judge(claim, resolved_marking(rows))
+        except Exception as exc:
+            issues.append(_issue("error", "E_UNREADABLE", "claim",
+                                 f"the instruments could not read this "
+                                 f"claim: {exc}"))
+            return {"ok": False, "issues": issues}
+        report["judge"] = {"verdict": r["verdict"],
+                           "disposition": r["disposition"],
+                           "grade": r["grade"],
+                           "unverified": sorted(r["unverified"]),
+                           "why": r.get("why")}
+        # A DEFINED ROW CANNOT BE VERIFIED (29.09, blind cloud test): "verify
+        # ['may_sign']" sent a reader to check a formula, and "verify ['L']"
+        # sent one to check a paradox whose refusal is permanent. The list of
+        # names stays as the core computed it; only the advice says where the
+        # checking actually is.
+        _defs = {x["name"] for x in rows if x.get("status") == "defined"}
+        if r["disposition"] == "OPEN" and _defs & set(r["unverified"]):
+            _by = {x["name"]: x for x in rows}
+            _inputs, _seen, _todo = [], set(), sorted(r["unverified"])
+            while _todo:
+                _n = _todo.pop(0)
+                if _n in _seen:
+                    continue
+                _seen.add(_n)
+                _row = _by.get(_n) or {}
+                if _row.get("status") == "defined":
+                    _todo += sorted(names_in(_row.get("ground")) & set(_by))
+                elif _row.get("status") == "unverified":
+                    _inputs.append(_n)
+            _kinds = {n: (report.get("passport_rows") or {}).get(n, {}).get("kind")
+                      for n in r["unverified"]}
+            _px = [n for n in sorted(r["unverified"]) if _kinds.get(n) == "PARADOX"]
+            _ud = [n for n in sorted(r["unverified"]) if _kinds.get(n) == "UNDERDETERMINED"]
+            _why = "not established"
+            if _inputs:
+                _why += f" — check {sorted(set(_inputs))} (it could still turn either way)"
+            _dd = [n for n in sorted(r["unverified"]) if n in _defs and n not in _px + _ud]
+            if _dd:
+                _why += f"; {_dd} are defined rows: they settle when their inputs do"
+            if _px:
+                _why += f"; {_px} is a paradox: no check can settle it, the refusal is permanent"
+            if _ud:
+                _why += f"; {_ud} is underdetermined: no check settles it, only a stipulation"
+            report["judge"]["why"] = _why
+        # CHANCE IS NOT A WEAK LINK TO CHECK (2026-11-05, the curator: "да, делай оба"): a verified row whose degree
+        # lies strictly inside (0, 1) enters the judge as Z (_row_mark), but no document settles it — only its
+        # outcome, once observed, and then the row is verified or refuted without a degree. The core's list stays as
+        # computed (as for defined rows above); the report names these apart, the reason says where the answer is,
+        # and the reverse pass offers only rows a check can settle, holding the chance ones at Z.
+        _byn = {x.get("name"): x for x in rows}
+        # CLASSICAL REASONING IS SAFE HERE (2026-11-06, lean/ZAxiomsRead.lean, ClassicalAgreement.lean): when every
+        # statement the claim reads is clean (T or F to the judge — no dirty, chance or searched row), the classical
+        # laws, the substitution of equivalents and the excluded middle hold for it; said, so a reader or an agent
+        # knows where classical shortcuts are licensed and where they are not
+        _atoms = sorted(names_in(claim) & set(_byn))
+        _rm = resolved_marking(rows)
+        if _atoms and all(_rm.get(a) in ("T", "F") for a in _atoms):
+            report["judge"]["classical_safe"] = True
+        _searched = sorted(n for n in r["unverified"] if n in _byn and _byn[n].get("status") == "verified"
+                           and (_byn[n].get("ground_kind") or "").strip() == "search")
+        if _searched:
+            report["judge"]["search_not_proof"] = _searched
+            report["judge"]["why"] = ((report["judge"].get("why") or "") + ("; " if report["judge"].get("why")
+                                      else "") + f"{_searched} rest on a search that found nothing — a search proves "
+                                      "no 'none' and no 'for all': prove it, or ground the bound the search covered")
+        _chance = sorted(n for n in r["unverified"] if n in _byn and _byn[n].get("status") == "verified"
+                         and (_byn[n].get("degree") or "").strip() and _row_mark(_byn[n]) == "Z")
+        if _chance:
+            report["judge"]["chance"] = _chance
+            report["judge"]["why"] = ((report["judge"].get("why") or "") + ("; " if report["judge"].get("why")
+                                      else "") + f"{_chance} carry a degree between 0 and 1: chance — no document "
+                                      "settles it; the probability is in the degree section, and only the observed "
+                                      "outcome (the row then verified or refuted, without a degree) makes it T or F")
+        _checkable = sorted(set(r["unverified"]) - set(_chance))
+        if _chance:
+            # the core's reason names every Z input to verify; a chance row is not one to verify
+            _w = report["judge"].get("why") or ""
+            _w = _w.replace(f"verify {sorted(r['unverified'])} (it could still turn either way)",
+                            f"verify {_checkable} (it could still turn either way)" if _checkable
+                            else "no check settles it")
+            report["judge"]["why"] = _w.replace(f"check {sorted(r['unverified'])} (", f"check {_checkable} (")
+        if _checkable:
+            report["what_to_check"] = what_to_check(claim, resolved_marking(rows), _checkable, hold=_chance)
+        # The grade stands as the core computed it; what the marking could
+        # not say is added beside it rather than folded into it.
+        touched = sorted(dead & names_in(claim))
+        if touched and r["grade"] == "until-verification":
+            report["judge"]["credit"] = "UNREDEEMABLE"
+            report["judge"]["unredeemable"] = touched
+
+    if what["epoch"]:
+        # One crossing per declared event: everything held by that event's
+        # clock returns to the mark AT ONCE (an event is not a sequence of
+        # private misfortunes), and the claim is read on both sides of it.
+        events = {}
+        for r in rows:
+            ev = (r.get("expires_on") or "").strip()
+            if ev:
+                events.setdefault(ev, []).append(r["name"])
+        staged = []
+        # ONE "BEFORE", AND ONE "AFTER" PER DISTINCT READING (2026-09-27, PR #4):
+        # "before" is the same for every event, and an event whose rows the claim
+        # does not read leaves the claim's marking as it was — a mark foreign to
+        # the claim never moves the judge (the logic red team, PR #3). 800 such
+        # events cost 76.7 s, two judges each; they now cost one.
+        _phi_atoms = _formula_atoms(formalize(claim))
+        _key = lambda mk: tuple(sorted((k, v) for k, v in mk.items() if k in _phi_atoms))
+        _judged = {}
+        def _judge_once(mk):
+            k = _key(mk)
+            if k not in _judged:
+                _judged[k] = judge(claim, mk)
+            return _judged[k]
+        for ev in sorted(events):
+            # The crossing is applied to the ROWS, not to the marking, so
+            # that whatever leans on the expiring ground is recomputed
+            # rather than left standing on a value that no longer has one.
+            # Reading the marking alone is how the first draft of this floor
+            # printed "survives" for every document with a definition in it:
+            # `to_marking` drops defined rows, so expiring their ground moved
+            # nothing the judge could see.
+            gone = set(events[ev])
+            rows_after = [dict(r, status="unverified", ground="")
+                          if r["name"] in gone else r for r in rows]
+            try:
+                b = _judge_once(resolved_marking(rows))
+                a = _judge_once(resolved_marking(rows_after))
+            except Exception as exc:
+                issues.append(_issue("error", "E_UNREADABLE", "claim",
+                                     f"the epoch floor could not read this "
+                                     f"claim: {exc}"))
+                return {"ok": False, "issues": issues}
+            staged.append({
+                "event": ev,
+                "expires": sorted(events[ev]),
+                "before": {"verdict": b["verdict"], "grade": b["grade"]},
+                "after": {"verdict": a["verdict"], "grade": a["grade"]},
+                # SURVIVES means the CONCLUSION — the disposition EARNED /
+                # REFUTED / OPEN — is the same on both sides, not the bare
+                # letter. The letter lies at the mark: `~p` is F while p is
+                # verified (REFUTED) and still F once p expires, but only
+                # because ¬Z = F — the warranty is gone and the claim is OPEN
+                # (PR #5, E1). Nor is surviving ONE crossing a statement about
+                # grounds: only a verdict that survives EVERY crossing reads
+                # none of them (EpochBoundary).
+                "survives": b["disposition"] == a["disposition"]})
+        report["epoch"] = staged
+
+    if what["ledger"]:
+        # Тот же инвариант, что у numeric-ветки выше, и он здесь не был
+        # соблюдён: валидная глава книги роняла run интервальной строкой
+        # (2026-08-27). Отказ прибора — issue к утверждению, не трейсбек.
+        book = to_book(rows)
+        try:
+            judged = zbook.judge_book(book) if book else None
+        except Exception as exc:
+            issues.append(_issue("error", "E_UNREADABLE", "ledger",
+                                 f"the ledger could not read these rows: "
+                                 f"{exc}"))
+            return {"ok": False, "issues": issues}
+        # THE SAME GUARD OVER THE WHOLE BRANCH, not only its first call: the
+        # brackets and the naming read the book again, and an OverflowError
+        # from a value past float range escaped run() from here (MEASURED
+        # 2026-09-24: 200 factors of 10**1000 — the public API answered 500).
+        try:
+            if judged is not None:
+                report["ledger"] = {
+                    "claims": {k: {"disposition": v["disposition"],
+                                   "assurance": v["assurance"]}
+                               for k, v in judged.items()},
+                    "brackets": {g: list(iv) for g, iv
+                                 in zbook.trust_interval(book).items()},
+                    "naming": zbook.naming_assumption(book)}
+        except Exception as exc:
+            issues.append(_issue("error", "E_UNREADABLE", "ledger",
+                                 f"the ledger could not read these rows: "
+                                 f"{exc}"))
+            return {"ok": False, "issues": issues}
+
+    if what.get("bounds"):
+        # THE KERNEL CHECKS, THE STUDIO SEARCHES (the decision of 2026-10-09: no budget in
+        # ZTL's kernel). A brought tree is only checked; without one the studio looks for
+        # one within its own budget, and says so. Same invariant as above: a refusal is a
+        # verdict in the report, never a traceback.
+        import zflcert
+        try:
+            sheet = to_sheet(rows)
+            report["bounds"] = zflcert.run_all(doc["bounds"], sheet)
+        except Exception as exc:
+            issues.append(_issue("error", "E_UNREADABLE", "bounds",
+                                 f"the bound could not be read: {exc}"))
+            return {"ok": False, "issues": issues}
+
+    # БИРКА НА ЗАВИСЯЩИХ. Заработавшее на объявленном не прячется среди
+    # заработавшего на предъявимом.
+    # COMPUTED BEFORE THE RECEIPT, which reads the tag from this report. While
+    # this block stood below the receipt, the receipt issued by run() carried
+    # `on_stipulation: null` ALWAYS, and could not tell a verdict standing on
+    # what was said from one standing on an act (MEASURED 2026-09-24: the same
+    # document under a story tier and an act tier gave receipts equal to the
+    # byte). Found by the Authority Lab prototype.
+    стип = on_stipulation(rows, ground_registry) if ground_registry else []
+    if стип:
+        report["on_stipulation"] = стип
+
+    # КВИТАНЦИЯ ВЫДАЁТСЯ ВСЕГДА, когда есть что квитировать. Иначе она
+    # остаётся доступной только тому, кто зовёт питон — а человек в тетради
+    # её получить не может (нашёл КУРАТОР вопросом 2026-08-28, четвёртый за
+    # день случай «построено и не позвано»). Чего не объявили — помечено
+    # null, а не подразумевается.
+    if claim and ("judge" in report or "numeric" in report):
+        import warrant_receipt
+        report["receipt"] = warrant_receipt.receipt(
+            {"report": report}, doc, (doc.get("epoch") or ""),
+            ground_registry=ground_registry)
+
+    if demoted:
+        # ПОИМЁННО, не счётом: читатель должен видеть, ЧЬИ вердикты стояли
+        # на непредъявленных основаниях, — иначе понижение неотличимо от
+        # честного «не проверено», и ворота работают молча.
+        report["demoted_grounds"] = sorted(demoted)
+    if doc.get("sets") and not doc.get("sets_refused"):
+        # THE NAIVE VIEW of the same universe (znaive.check): each set's earned members and non-members, a passport
+        # for every cell left undecided, and the quantified claims the table's claim cannot state.
+        report["sets"] = znaive.check(sets_universe(doc["sets"]))
+    if what.get("degree"):
+        try:
+            d = degree_report(doc, rows, normalise((doc.get("claim") or "").strip(), rows))
+        except Exception as exc:                          # the invariant: a validated document never raises
+            d = {"refused": f"the degree could not be computed ({type(exc).__name__})"}
+        if d is not None:
+            report["degree"] = d
+    return {"ok": True, "issues": issues, "applies": what, "report": report}

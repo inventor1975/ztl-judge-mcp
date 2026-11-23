@@ -1,0 +1,47 @@
+# ZTL core — vendored copy
+
+These 14 modules (plus three of its stands) are the ZTL logic kernel (the judge), vendored from the ZTL repository so introspect
+clones and runs self-contained. **Source of truth: https://github.com/inventor1975/ZTL**
+
+Vendored: 2026-11-23 the WHOLE core re-synced from inventor1975/ZTL @ c1bf15f (the pure branch, 2026-11-22: the Kleene/lazy register removed; EARNED/REFUTED/IF STABLE from ZTL's own readings — NEW zread.py; the judge's field `lazy` is now `forced`, values T/F/N; the passport's grounding by the stable step, N hardened to the mark Z outward; NEW zseries.py, a dependency of the numeric line that had moved on meanwhile); the studio's zfl.py ported the same four lines as ZTL's zfl.py (N -> Z at the marking and in passport_rows, numeric `forced`);
+before it 2026-11-09 znum.py from inventor1975/ZTL @ 5b24d19 (the reading memory `_MEMO` per thread: the studio is a ThreadingHTTPServer, and two readings at once had shared one memory — an interval computed for another box could be read; MEASURED on a 12-thread bridge: random "no verdict", green sequentially);
+before it 2026-11-08 (night, 4) zsystem.py, ztrigcert.py from inventor1975/ZTL @ 878f483 (the red team: staggered Newton starts, no ZeroDivisionError/OverflowError ending a region search, significant-bit rounding of certificates, sin/cos witnesses up to M = 20000 — readings past |x| ~ 700 were [-1, 1], a 20 s cap on a region search); zfl.py, test_zfl.py (sec25);
+before it 2026-11-08 (night, 3) zexpcert.py, zfunc.py, zsystem.py from inventor1975/ZTL @ 68aaf83 (speed, the same answers: exp_cert in integers, _down in integers, solve_all's search_budget — the pump 7.2 s -> 2.6 s, the oil cooler 18.7 s -> 3.9 s); the studio's zfl.py: 8 searches for one unknown beside parameter intervals;
+before it 2026-11-08 (night, 2) NEW zimplicit.py from inventor1975/ZTL @ e0fb7e6 (the implicit judge: a certificate searched, every reading checked — for one unknown with its region and real parameters, exactly one solution per parameter value within [lo, hi]); the studio's zfl.py, zfldoc.py, test_zfl.py: W_IMPLICIT, and scientific notation read at the door;
+before it 2026-11-08 (night) zsystem.py from inventor1975/ZTL @ 3134a61 (the shakedown: only the solutions whose cube meets the search region, sorted — cos x = 0.99 in [-100, 100] had listed two roots outside); the studio's zfl.py, zfldoc.py, test_zfl.py: one unknown with a region and an exact answer keeps only its values in the region (W_REGION_FILTERED);
+before it 2026-11-08 (evening) zfunc.py, ztrigcert.py, zsystem.py from inventor1975/ZTL @ 4ede522 (the kernel's sin/cos series and the Lean-witness brackets in INTEGERS — the same exact numbers, no gcd per term; Newton's proposals in floats, every certificate still checked exactly: a system with sin 30 s -> 0.12 s); the studio's zfl.py and zfldoc.py: W_REGION_UNUSED also says "searched but not exhausted" (a narrow port);
+before it 2026-11-08 NEW zsystem.py from inventor1975/ZTL @ 776bcff (a SYSTEM of equations: a solution in a cube, the only one there — Krawczyk, the contraction form, checked exactly with zcertify's readings; with a search region `x = ? in [a, b]` on every unknown, ALL the solutions there); the studio's zfl.py and zfldoc.py gain the same feature (a narrow port: is_question / question_region, _system_answer, W_SYSTEM_LOCAL / W_SYSTEM_ALL / W_REGION_UNUSED — nothing else of ZTL's zfl.py moved);
+before it 2026-11-05 NEW zsteps.py (the price of an algebra step: solution sets, exactly) and NEW znaive.py (sets defined by a property, self-reference allowed: memberships, passports, claim dispositions), with fixedpoint.py and zpassport.py refreshed (comments only: "dirty" for "unverified"), all from inventor1975/ZTL @ 4fb971a; the studio serves them at /tools (POST /api/steps, /api/naive — the kernels' check(), refusals by the form of the request);
+before it 2026-10-29 (evening) ztljudge.py, zbackward_tree.py from inventor1975/ZTL @ 1ae8a5c (IF STABLE decided by completions: EARNED/REFUTED = strong Kleene T/F, EARNED/REFUTED IF STABLE = T/F in every completion of the dirty atoms; the backward tree carries the completion set);
+before it 2026-10-29 ztljudge.py, zbackward_tree.py from inventor1975/ZTL @ 5621b52 (two new dispositions, EARNED IF STABLE and REFUTED IF STABLE, and the field `if_stable`; the backward tree carries the Kleene value through its worlds), with ztl.py, zverify.py, zbackward.py at the same commit (comments only: "dirty" for "unverified");
+before it 2026-10-20 znum.py, znumjudge.py, zcertify.py, ztl.py from inventor1975/ZTL @ dde1e6c (integral(f, x, a, b) and pi on the numeric floor; functions exp ln log10 sin cos tan atan pow), with NEW zfunc.py, zintegral.py, zaffine.py, zaffinecert.py, zatancert.py, zexpcert.py, zleibcert.py, zmonocert.py, ztaylorcert.py, ztrigcert.py, zderive.py, entailment.py (their dependencies: the in-run checks against the Lean witnesses); test_sqrt.py kept at the studio's version (ZTL's imports zfl, which the mutation run cannot see);
+before it 2026-10-10 znumsolve.py from inventor1975/ZTL @ 3be637b (parameters only on the right of two or more equalities: exact at the corners — (x + y == p) & (x - y == q) was left at (-inf, inf));
+before it 2026-10-09 NEW zcertify.py from inventor1975/ZTL @ c94bc5b (a bound over the whole box checked on a brought certificate — a bisection tree of monotone and interval leaves, exact, no budget; a quantity solved from a linear system is solved by the kernel itself, Cramer; the studio's zflcert.py searches, the kernel only checks);
+before it the same day zbackward_tree.py from inventor1975/ZTL @ 6df2b38 (repeated unverified inputs as worlds — up to six of them, the rest still read off the tables);
+before it the same day zbackward.py + NEW zbackward_tree.py @ 0bbff54 (the reverse pass read off the connectives' tables: the same minimal sets as the enumeration, in its order, with no size cut where every unverified input occurs once; elsewhere the enumeration as before);
+before it the same day znumsolve.py @ ca17ad4 (ONE parameter of rank > 1 — one steel batch in every stiffness, x = p/(1+p^2) — solved exactly: the others at their corners, its ends and the real critical points of N(p)/D(p); two such parameters still refused);
+before it the same day znumsolve.py @ 3a296b5 (a name DEFINED by one equality is narrowed: by the exact corners when the expression is multilinear — tau == R*C, Tj == Ta + P*(R1+R2) — and by the interval reading otherwise — P == I*I*R, f == 1/(2*pi*tau) — sound, logged as such; both only for definitions, never inside a system);
+before it the same day znumsolve.py + znumjudge.py @ 62b71ea (the verdict reads the sheet as given — a measured quantity is no longer narrowed by the claim it is judged against; a solved unknown remembers its dependence);
+before it the same day znumsolve.py @ feacdd4 (linear systems with parameters in the coefficients — matrices, exact at the corners when each parameter is rank-one, an equality outside the linear rows named in the log; the other files unchanged since ea05959);
+before it 2026-09-27 from inventor1975/ZTL @ ea05959 (the judge's worst cases: nested -> no longer doubles, the reverse pass memoised;
+before it 7a432ce, the warranty grade exact and seed-independent; a constant is not an atom in the lazy register;
+before it 7e3888b, two wrong forced verdicts fixed: a sum's lattice, roots left of a root midpoint;
+before it 4cc5504, integer-typed quantities read on the integers, exactly, no listing;
+before it c3f3514, one name to a higher degree: critical points, Sturm roots;
+before it f843cce, products of names at the corners; irrational roots exactly;
+before it 1fee1fe, one of several equalities of one unknown is a set of roots;
+before it 86266ea, the exact root of a known number is a constant;
+before it 00cbfd8, 0 times an infinite end is 0; an unknown mark is refused;
+before it 42b607a, an unknown is the question, not a source: provenance over grounds;
+before it b98ebe7, the solver uses only what the claim commits to;
+before it c83ee54, systems: each power of a name its own column;
+before it b91d1ec, the splitter can find comparisons without reading them;
+before it 4185023, parabolas read exactly, roots from the discriminant;
+before it 773e917, a side that is not arithmetic is refused in words;
+before it 0ecd108, wording: E is the judge's stop, not a value;
+before it aa0eaf4, a name is one number across the whole claim, 1/inf an exact zero, negative intervals read;
+before it cc6cc28, formula length cap; before it 9056479, zbackward; before it 1dc81f6, znumjudge reads sqrt).
+Earlier: 2026-09-13 @ f0a2f50; refreshed 2026-09-21 to 9fde0fd and 383ffb4 (this line
+was not updated then — the files were; checked file by file on 2026-09-24).
+To refresh: copy fixedpoint/zbackward/zbackward_tree/zbook/zmodal/znum/znumjudge/znumsolve/zpassport/ztime/ztl/ztljudge/zverify.py
+from the ZTL repo root into this directory.

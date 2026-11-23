@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.inventor1975/ztl-judge",
+  "title": "ZTL Judge",
+  "description": "Zero-trust logic judge: ZFL claims, algebra derivation steps, sets defined by a property.",
+  "version": "1.1.0",
+  "websiteUrl": "https://studio.ztljudge.com",
+  "repository": {
+    "url": "https://github.com/inventor1975/ztl-judge-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.ztljudge.com/mcp"
+    }
+  ]
+}
