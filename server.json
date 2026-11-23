@@ -3,7 +3,7 @@
   "name": "io.github.inventor1975/ztl-judge",
   "title": "ZTL Judge",
   "description": "Zero-trust logic judge: ZFL claims, algebra derivation steps, sets defined by a property.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "websiteUrl": "https://studio.ztljudge.com",
   "repository": {
     "url": "https://github.com/inventor1975/ztl-judge-mcp",
