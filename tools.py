@@ -19,7 +19,7 @@ import zflexamples
 import znaive          # noqa: E402  (ztlcore/ is on the path through zfl)
 import zsteps          # noqa: E402
 
-STUDIO_COMMIT = "02f908c"
+STUDIO_COMMIT = "28ed15c"
 _CYRILLIC = re.compile("[А-Яа-яЁё]")
 
 

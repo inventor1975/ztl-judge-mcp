@@ -63,7 +63,7 @@ bad = tools.judge("{not json")
 check("broken JSON is refused as an issue, not raised", (bad["ok"], bad["issues"][0]["code"]), (False, "E_JSON"))
 check("the back-reading facts carry English keys only",
       [k for k in r["back_reading_facts"] if CYR.search(k)], [])
-check("the report names the studio commit it ran", r["studio_commit"], "02f908c")
+check("the report names the studio commit it ran", r["studio_commit"], "28ed15c")
 # degrees (2026-11-05) reach the service: both sides — no degree, no section; degrees -> the Fréchet interval + threshold
 _A = {"name": "a", "status": "verified", "ground": "m", "degree": "0.3", "means": "a"}
 _B = {"name": "b", "status": "verified", "ground": "m", "degree": "0.7", "means": "b"}

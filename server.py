@@ -478,6 +478,24 @@ class RequestLog:
         return None
 
 
+class NoStreamGet:
+    """GET /mcp answers 405 at once (2026-11-24). The server is stateless and offers no server-initiated SSE stream,
+    so the MCP spec's answer to a GET is 405; the SDK instead held the GET open, and a registry probe (M8ven) that
+    waited on it recorded the server as one that "needs a credential". POST is untouched."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and scope.get("method") == "GET" and scope.get("path", "").rstrip("/") == "/mcp":
+            await send({"type": "http.response.start", "status": 405,
+                        "headers": [(b"allow", b"POST, OPTIONS"), (b"content-type", b"application/json")]})
+            await send({"type": "http.response.body",
+                        "body": b'{"error": "method not allowed: this MCP server is stateless; use POST /mcp"}'})
+            return
+        await self.app(scope, receive, send)
+
+
 def build_app(rate_per_minute: int = RATE_PER_MINUTE, request_log: str | None = REQUEST_LOG,
               rate_total_per_minute: int = RATE_TOTAL_PER_MINUTE):
     app = mcp.streamable_http_app(
@@ -486,6 +504,7 @@ def build_app(rate_per_minute: int = RATE_PER_MINUTE, request_log: str | None = 
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
             allowed_hosts=[*PUBLIC_HOSTS, "127.0.0.1:*", "localhost:*"]))
+    app.add_middleware(NoStreamGet)                   # inside CORS: the 405 still carries the CORS headers
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "OPTIONS"],
                        allow_headers=["content-type", "accept", "mcp-protocol-version", "mcp-session-id"],
                        expose_headers=["mcp-session-id"])

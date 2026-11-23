@@ -80,7 +80,9 @@ LIAR = {"claim": "L", "rows": [{"name": "L", "means": "this sentence is false",
 
 print("REST, for the page")
 code, _, body = call("GET", "/health", ip="10.0.0.1")
-check("GET /health", (code, body["ok"], body["studio_commit"]), (200, True, "02f908c"))
+check("GET /health", (code, body["ok"], body["studio_commit"]), (200, True, "28ed15c"))
+code, headers, _ = call("GET", "/mcp", ip="10.0.0.4")
+check("GET /mcp answers 405 at once (stateless, no SSE stream)", (code, headers.get("allow") or headers.get("Allow")), (405, "POST, OPTIONS"))
 code, _, body = call("GET", "/language", ip="10.0.0.1")
 check("GET /language: 13 columns", (code, len(body["row_columns"])), (200, 13))
 code, _, body = call("GET", "/examples", ip="10.0.0.1")
